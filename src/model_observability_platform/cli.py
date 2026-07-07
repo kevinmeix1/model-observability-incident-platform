@@ -9,6 +9,7 @@ from .checks import run_checks
 from .dashboard import render_dashboard
 from .incidents import create_incidents
 from .io import read_csv, write_json
+from .network_security import build_network_security_report
 from .policy_audit import audit_platform_policy
 from .reliability_control import build_reliability_plan
 from .resource_optimizer import build_resource_optimization_report
@@ -28,6 +29,7 @@ def demo(output: str | Path) -> dict:
     trace_report = build_trace_report(root)
     chaos_drill = run_chaos_drill(root)
     resource_optimization = build_resource_optimization_report(root)
+    network_security = build_network_security_report(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -42,6 +44,7 @@ def demo(output: str | Path) -> dict:
         "trace_report": trace_report,
         "chaos_drill": chaos_drill,
         "resource_optimization": resource_optimization,
+        "network_security": network_security,
         "dashboard": str(dashboard),
     }
 
@@ -49,7 +52,7 @@ def demo(output: str | Path) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Model observability and incident response platform")
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ["demo", "reliability-plan", "policy-audit", "trace-report", "chaos-drill", "optimize-resources"]:
+    for command in ["demo", "reliability-plan", "policy-audit", "trace-report", "chaos-drill", "optimize-resources", "network-security"]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
     args = parser.parse_args(argv)
@@ -65,4 +68,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(run_chaos_drill(args.output), indent=2, sort_keys=True))
     elif args.command == "optimize-resources":
         print(json.dumps(build_resource_optimization_report(args.output), indent=2, sort_keys=True))
+    elif args.command == "network-security":
+        print(json.dumps(build_network_security_report(args.output), indent=2, sort_keys=True))
     return 0

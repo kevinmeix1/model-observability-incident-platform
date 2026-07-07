@@ -76,6 +76,8 @@ For controlled failure injection and recovery objectives, see [resilience and ch
 
 For workload right-sizing, HPA/VPA guardrails, and Airflow pool sizing, see [resource optimization](docs/resource-optimization.md).
 
+For runtime network boundaries, mTLS, and allow-listed service flows, see [network security](docs/network-security.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

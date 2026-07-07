@@ -9,6 +9,7 @@ from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cli import demo
 from model_observability_platform.incidents import create_incidents
 from model_observability_platform.io import read_csv, write_json
+from model_observability_platform.network_security import build_network_security_report
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
@@ -120,6 +121,20 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("incident creation", " ".join(report["guardrails"]))
             self.assertTrue(any("prewarm_replicas" in item["actions"] for item in report["recommendations"]))
             self.assertTrue((Path(tmp) / "reports" / "resource_optimization.json").exists())
+
+    def test_network_security_topology_and_manifests_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        network_security = (repo / "kubernetes" / "network-security.yaml").read_text(encoding="utf-8")
+
+        for expected in ["kind: NetworkPolicy", "default-deny-all", "PeerAuthentication", "mode: STRICT", "AuthorizationPolicy"]:
+            self.assertIn(expected, network_security)
+        with tempfile.TemporaryDirectory() as tmp:
+            report = build_network_security_report(tmp)
+
+            self.assertEqual(report["mtls_mode"], "STRICT")
+            self.assertEqual(report["allowed_flow_count"], 3)
+            self.assertTrue(any(flow["destination"] == "telemetry-collector" for flow in report["allowed_flows"]))
+            self.assertTrue((Path(tmp) / "reports" / "network_security.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

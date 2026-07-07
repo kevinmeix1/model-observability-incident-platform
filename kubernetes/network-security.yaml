@@ -1,0 +1,101 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ml-observability
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: ml-observability
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-telemetry-ingest
+  namespace: ml-observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: telemetry-collector
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: model-serving-runtime
+      ports:
+        - protocol: TCP
+          port: 4317
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-incident-webhook-egress
+  namespace: ml-observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: incident-router
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.20.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: observability-strict-mtls
+  namespace: ml-observability
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-incident-router-webhooks
+  namespace: ml-observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: incident-router
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/ml-observability/sa/incident-router
+      to:
+        - operation:
+            methods: ["POST"]
+            ports: ["443"]

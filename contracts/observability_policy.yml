@@ -1,0 +1,29 @@
+policy_name: model_observability_policy
+owner: ml-platform-observability
+version: 1
+checks:
+  feature_drift:
+    severity: high
+    method: mean_delta
+  prediction_drift:
+    severity: high
+    max_score_mean_delta: 0.08
+  latency_slo:
+    severity: medium
+    p95_ms: 85
+  error_rate:
+    severity: high
+    max_rate: 0.02
+  freshness:
+    severity: medium
+    max_minutes: 20
+incident_policy:
+  dedupe_key: check_name_and_observed_signature
+  alert_channels:
+    - slack-placeholder
+    - pagerduty-placeholder
+  required_fields:
+    - incident_id
+    - severity
+    - root_cause
+    - next_action

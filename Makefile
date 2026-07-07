@@ -1,4 +1,4 @@
-.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan kubernetes-plan minikube-up test clean
+.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan ci-verify kubernetes-plan minikube-up test clean
 
 demo:
 	PYTHONPATH=src python3 -m model_observability_platform demo --output .local
@@ -35,6 +35,16 @@ slo-report:
 
 cloud-plan:
 	PYTHONPATH=src python3 -m model_observability_platform cloud-plan --output .local
+
+ci-verify:
+	PYTHONPATH=src python3 -m compileall -q src tests
+	test -f .local/reports/model_observability_dashboard.html
+	test -f .local/reports/governance_evidence_bundle.json
+	test -f .local/reports/slo_error_budget.json
+	test -f .local/reports/cloud_migration_plan.json
+	python3 -m json.tool .local/reports/governance_evidence_bundle.json >/dev/null
+	python3 -m json.tool .local/reports/slo_error_budget.json >/dev/null
+	python3 -m json.tool .local/reports/cloud_migration_plan.json >/dev/null
 
 kubernetes-plan:
 	@find kubernetes gitops -name '*.yaml' -maxdepth 3 -print

@@ -66,6 +66,8 @@ For the latest reliability control-plane pass, see [advanced orchestration asses
 
 For the Kubernetes/Airflow robustness layer, see [Kubernetes and Airflow robustness](docs/kubernetes-airflow-robustness.md).
 
+For the operator-facing reliability planner, see [advanced reliability control plane](docs/control-plane-depth.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

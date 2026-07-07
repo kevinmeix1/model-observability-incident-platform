@@ -1,0 +1,52 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: model-observability-kafka-scaledjob
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    app.kubernetes.io/component: event-driven-checks
+spec:
+  pollingInterval: 20
+  successfulJobsHistoryLimit: 10
+  failedJobsHistoryLimit: 20
+  maxReplicaCount: 12
+  scalingStrategy:
+    strategy: accurate
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    backoffLimit: 2
+    template:
+      metadata:
+        labels:
+          kueue.x-k8s.io/queue-name: observability-checks-queue
+          kueue.x-k8s.io/priority-class: incident-critical
+      spec:
+        serviceAccountName: model-observability-runner
+        restartPolicy: Never
+        containers:
+          - name: observability-worker
+            image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+            command: ["bash", "-lc"]
+            args:
+              - "python -m model_observability_platform demo"
+            resources:
+              requests:
+                cpu: "250m"
+                memory: "512Mi"
+              limits:
+                cpu: "1"
+                memory: "1Gi"
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: redpanda.kafka.svc.cluster.local:9092
+        consumerGroup: model-observability-workers
+        topic: prediction-log-windows
+        lagThreshold: "10"
+        activationLagThreshold: "2"
+        offsetResetPolicy: latest
+        allowIdleConsumers: "false"
+        limitToPartitionsWithLag: "true"
+        version: "1.0.0"

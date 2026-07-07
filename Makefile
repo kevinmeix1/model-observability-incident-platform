@@ -1,7 +1,10 @@
-.PHONY: demo kubernetes-plan minikube-up test clean
+.PHONY: demo reliability-plan kubernetes-plan minikube-up test clean
 
 demo:
 	PYTHONPATH=src python3 -m model_observability_platform demo --output .local
+
+reliability-plan:
+	PYTHONPATH=src python3 -m model_observability_platform reliability-plan --output .local
 
 kubernetes-plan:
 	@find kubernetes -name '*.yaml' -maxdepth 3 -print

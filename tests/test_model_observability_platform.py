@@ -7,7 +7,8 @@ from pathlib import Path
 from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cli import demo
 from model_observability_platform.incidents import create_incidents
-from model_observability_platform.io import read_csv
+from model_observability_platform.io import read_csv, write_json
+from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.telemetry import generate_window
 
 
@@ -53,6 +54,33 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             "kueue.x-k8s.io/queue-name",
         ]:
             self.assertIn(expected, admission)
+
+    def test_event_driven_autoscaling_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        autoscaling = (repo / "kubernetes" / "event-driven-autoscaling.yaml").read_text(encoding="utf-8")
+
+        for expected in ["ScaledJob", "kafka", "lagThreshold", "limitToPartitionsWithLag", "observability-checks-queue"]:
+            self.assertIn(expected, autoscaling)
+
+    def test_reliability_control_escalates_high_burn_incident(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(
+                root / "reports" / "observability_report.json",
+                {
+                    "checks": [
+                        {"name": "error_rate", "passed": False, "observed": 0.04},
+                        {"name": "latency_slo", "passed": False, "observed": 120.0},
+                    ]
+                },
+            )
+            write_json(root / "reports" / "incident_summary.json", {"open_count": 4, "severity": "high"})
+
+            plan = build_reliability_plan(root)
+
+            self.assertGreaterEqual(burn_rate(0.04), 8.0)
+            self.assertEqual(plan["recommended_action"], "page_and_freeze_rollouts")
+            self.assertIn("rollback_decision", plan["impacted_assets"])
 
     def test_demo_creates_incidents_and_dashboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

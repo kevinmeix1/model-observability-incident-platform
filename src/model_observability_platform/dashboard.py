@@ -52,7 +52,10 @@ def rows(items: list[dict], columns: list[str]) -> str:
     return "\n".join(rendered)
 
 
-def render_dashboard(output_path: str | Path, *, report: dict, incident_summary: dict) -> Path:
+def render_dashboard(output_path: str | Path, *, report: dict, incident_summary: dict, reliability_plan: dict | None = None) -> Path:
+    reliability_plan = reliability_plan or {}
+    reliability_action = str(reliability_plan.get("recommended_action", "not planned")).replace("_", " ")
+    impacted_assets = ", ".join(str(asset).replace("_", " ") for asset in reliability_plan.get("impacted_assets", [])) or "none"
     check_rows = [
         {
             "check": LABELS.get(check["name"], check["name"]),
@@ -144,6 +147,15 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
             </div>
           </div>
           <div>
+            <div class="panel">
+              <h2>Reliability Control Plane</h2>
+              <div class="summary">
+                <div><span>Recommended action</span><strong>{esc(reliability_action)}</strong></div>
+                <div><span>Error burn rate</span><strong>{esc(reliability_plan.get('error_budget_burn_rate', 'n/a'))}</strong></div>
+                <div><span>Owner</span><strong>{esc(reliability_plan.get('routing', {}).get('owner', 'n/a'))}</strong></div>
+                <div><span>Impacted assets</span><strong>{esc(impacted_assets)}</strong></div>
+              </div>
+            </div>
             <div class="panel">
               <h2>Root Cause Summary</h2>
               <div class="summary">

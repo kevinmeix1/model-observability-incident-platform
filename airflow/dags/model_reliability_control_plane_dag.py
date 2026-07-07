@@ -30,6 +30,14 @@ def monitor_pod(task_id: str, command: str, *, priority_weight: int = 1):
         get_logs=True,
         is_delete_operator_pod=True,
         in_cluster=True,
+        deferrable=True,
+        logging_interval=30,
+        reattach_on_restart=True,
+        on_finish_action="delete_pod",
+        on_kill_action="delete_pod",
+        startup_timeout_seconds=180,
+        execution_timeout=timedelta(minutes=45),
+        pod_template_file="/opt/airflow/dags/repo/kubernetes/airflow-kubernetes-executor-pod-template.yaml",
         pool="observability_pool",
         priority_weight=priority_weight,
         retries=2,
@@ -92,6 +100,26 @@ if AIRFLOW_AVAILABLE:
             create_incidents >> route_alerts >> publish_runbook
             return publish_runbook
 
+        @task_group(group_id="slo_budget_and_capacity")
+        def slo_budget_group():
+            reserve_observability_quota = monitor_pod(
+                "reserve_kueue_observability_quota",
+                "kubectl get localqueue observability-checks-queue -n ml-observability",
+                priority_weight=4,
+            )
+            check_alert_budget = monitor_pod(
+                "check_alert_budget_burn_rate",
+                "python -m model_observability_platform demo",
+                priority_weight=5,
+            )
+            wait_for_dashboard_route = monitor_pod(
+                "wait_for_dashboard_route_deferrable",
+                "kubectl wait --for=condition=Accepted httproute/model-observability-dashboard-route -n ml-observability --timeout=5m",
+                priority_weight=3,
+            )
+            reserve_observability_quota >> check_alert_budget >> wait_for_dashboard_route
+            return wait_for_dashboard_route
+
         branch = BranchPythonOperator(task_id="branch_on_top_severity", python_callable=lambda: "rollback_recommendation")
         rollback_recommendation = monitor_pod("rollback_recommendation", "make demo", priority_weight=10)
         observe_only = EmptyOperator(task_id="observe_only")
@@ -100,7 +128,7 @@ if AIRFLOW_AVAILABLE:
         end = EmptyOperator(task_id="reliability_cycle_complete", outlets=[INCIDENTS, DASHBOARD])
 
         matrix = monitoring_matrix()
-        start >> telemetry_group() >> health_check_group(matrix) >> incident_group() >> branch
+        start >> telemetry_group() >> health_check_group(matrix) >> slo_budget_group() >> incident_group() >> branch
         branch >> rollback_recommendation >> publish_dashboard >> end
         branch >> observe_only >> publish_dashboard
 

@@ -1,0 +1,79 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: observability-cpu
+spec:
+  nodeLabels:
+    workload-class: observability
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: incident-critical
+value: 90000
+description: "Reliability checks, incident creation, and rollback recommendation jobs."
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: observability-checks-cluster-queue
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "pods"]
+      flavors:
+        - name: observability-cpu
+          resources:
+            - name: cpu
+              nominalQuota: "6"
+              borrowingLimit: "2"
+            - name: memory
+              nominalQuota: 12Gi
+              borrowingLimit: 4Gi
+            - name: pods
+              nominalQuota: "30"
+  preemption:
+    reclaimWithinCohort: Any
+    withinClusterQueue: LowerPriority
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: observability-checks-queue
+  namespace: ml-observability
+spec:
+  clusterQueue: observability-checks-cluster-queue
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: observability-checks-admission-smoke
+  namespace: ml-observability
+  labels:
+    kueue.x-k8s.io/queue-name: observability-checks-queue
+    kueue.x-k8s.io/priority-class: incident-critical
+    app.kubernetes.io/name: model-observability-incident-platform
+    app.kubernetes.io/component: admission-smoke
+spec:
+  parallelism: 3
+  completions: 3
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      priorityClassName: observability-incident-priority
+      restartPolicy: Never
+      containers:
+        - name: observability-admission-smoke
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+          command: ["bash", "-lc"]
+          args:
+            - "python -m model_observability_platform demo"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"

@@ -22,7 +22,9 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["KubernetesPodOperator", "task_group", "BranchPythonOperator", "Asset", "expand("]:
             self.assertIn(expected, dag_text)
-        for expected in ["CronJob", "RoleBinding", "ConfigMap", "PSI_THRESHOLD", "securityContext"]:
+        for expected in ["deferrable=True", "pod_template_file", "slo_budget_and_capacity", "reserve_kueue_observability_quota"]:
+            self.assertIn(expected, dag_text)
+        for expected in ["CronJob", "RoleBinding", "ConfigMap", "PSI_THRESHOLD", "securityContext", "kueue.x-k8s.io/queue-name"]:
             self.assertIn(expected, workload_text)
 
     def test_kubernetes_governance_and_airflow_pod_template_exist(self) -> None:
@@ -34,6 +36,23 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn(expected, governance)
         for expected in ["initContainers", "topologySpreadConstraints", "securityContext", "envFrom"]:
             self.assertIn(expected, pod_template)
+
+    def test_kueue_observability_admission_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        admission = (repo / "kubernetes" / "kueue-admission-control.yaml").read_text(encoding="utf-8")
+
+        for expected in [
+            "ResourceFlavor",
+            "ClusterQueue",
+            "LocalQueue",
+            "WorkloadPriorityClass",
+            "observability-checks-queue",
+            "incident-critical",
+            "borrowingLimit",
+            "preemption",
+            "kueue.x-k8s.io/queue-name",
+        ]:
+            self.assertIn(expected, admission)
 
     def test_demo_creates_incidents_and_dashboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

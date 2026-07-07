@@ -70,6 +70,8 @@ For the operator-facing reliability planner, see [advanced reliability control p
 
 For the policy-as-code audit layer, see [security and governance](docs/security-governance.md).
 
+For OpenTelemetry-style runtime traces, see [observability and tracing](docs/observability-tracing.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

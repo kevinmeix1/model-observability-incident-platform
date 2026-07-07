@@ -11,6 +11,7 @@ from model_observability_platform.io import read_csv, write_json
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.telemetry import generate_window
+from model_observability_platform.traceability import build_trace_report
 
 
 class ModelObservabilityPlatformTest(unittest.TestCase):
@@ -76,6 +77,19 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("event_driven_scaling", passed)
             self.assertIn("no_latest_image_tags", report["failed_checks"])
             self.assertIn("immutable_image_digest", report["failed_checks"])
+
+    def test_trace_report_and_otel_collector_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        collector = (repo / "kubernetes" / "opentelemetry-collector.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            trace = build_trace_report(tmp)
+
+            self.assertEqual(trace["span_count"], 5)
+            self.assertEqual(trace["root_service"], "collector")
+            self.assertTrue(any(span["name"] == "incident.dedupe" for span in trace["spans"]))
+            self.assertTrue((Path(tmp) / "reports" / "trace_report.json").exists())
+        for expected in ["kind: ConfigMap", "otlp", "k8sattributes", "memory_limiter", "prometheus", "batch"]:
+            self.assertIn(expected, collector)
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

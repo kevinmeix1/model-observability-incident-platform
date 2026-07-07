@@ -15,6 +15,7 @@ from .governance import build_governance_bundle
 from .incidents import create_incidents
 from .io import read_csv, write_json
 from .network_security import build_network_security_report
+from .orchestration_scorecard import build_orchestration_scorecard
 from .policy_audit import audit_platform_policy
 from .reliability_control import build_reliability_plan
 from .resource_optimizer import build_resource_optimization_report
@@ -54,6 +55,7 @@ def demo(output: str | Path) -> dict:
         description="Reviewer landing page for generated reliability dashboard, incident evidence, SLOs, migration, and governance artifacts.",
         dashboard="model_observability_dashboard.html",
     )
+    orchestration_scorecard = build_orchestration_scorecard(root, project="Model Observability Incident Platform")
     supply_chain = build_supply_chain_evidence(
         root,
         project="Model Observability Incident Platform",
@@ -77,6 +79,7 @@ def demo(output: str | Path) -> dict:
         "cloud_migration": cloud_migration,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
+        "orchestration_scorecard": orchestration_scorecard,
         "supply_chain": supply_chain,
     }
 
@@ -117,6 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         "slo-report",
         "cloud-plan",
         "supply-chain",
+        "orchestration-scorecard",
     ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
@@ -147,4 +151,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_cloud_migration_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "supply-chain":
         print(json.dumps(build_supply_chain_evidence(args.output, project="Model Observability Incident Platform", artifact_name="model-observability-demo-artifacts", workflow="Model Observability CI", namespace="mlops-observability"), indent=2, sort_keys=True))
+    elif args.command == "orchestration-scorecard":
+        print(json.dumps(build_orchestration_scorecard(args.output, project="Model Observability Incident Platform"), indent=2, sort_keys=True))
     return 0

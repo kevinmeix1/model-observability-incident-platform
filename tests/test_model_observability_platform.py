@@ -14,6 +14,7 @@ from model_observability_platform.governance import build_governance_bundle
 from model_observability_platform.incidents import create_incidents
 from model_observability_platform.io import read_csv, read_json, write_json
 from model_observability_platform.network_security import build_network_security_report
+from model_observability_platform.orchestration_scorecard import build_orchestration_scorecard
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
@@ -230,8 +231,22 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
+
+    def test_orchestration_scorecard_covers_advanced_controls(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scorecard = build_orchestration_scorecard(root, repo_root=repo, project="Model Observability Incident Platform")
+            names = {check["name"] for check in scorecard["checks"] if check["passed"]}
+
+            self.assertTrue(scorecard["passed"])
+            self.assertGreaterEqual(scorecard["score"], 90.0)
+            self.assertIn("dynamic_task_mapping", names)
+            self.assertIn("kueue_admission", names)
+            self.assertIn("supply_chain_provenance", names)
+            self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
     def test_supply_chain_evidence_and_policy_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -268,6 +283,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "reliability_control_plan.json",
                 "governance_evidence_bundle.json",
                 "slo_error_budget.json",
+                "orchestration_scorecard.json",
                 "supply_chain_evidence.json",
                 "cloud_migration_plan.json",
             ]:
@@ -302,6 +318,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertGreaterEqual(result["incidents"]["open_count"], 4)
             self.assertTrue((root / "reports" / "model_observability_dashboard.html").exists())
             self.assertTrue((root / "reports" / "index.html").exists())
+            self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
             self.assertTrue((root / "reports" / "supply_chain_evidence.json").exists())
 
     def test_clean_window_passes_checks(self) -> None:

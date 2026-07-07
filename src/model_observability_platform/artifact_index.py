@@ -24,7 +24,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Supply Chain Evidence", "supply_chain_evidence.json", "Artifact hashes, GitHub attestations, SLSA provenance, and Sigstore policy controls."),
         ("Cloud Migration Plan", "cloud_migration_plan.json", "Managed cloud observability migration notes for Kubernetes and data platforms."),
         ("Traceability", "trace_report.json", "Telemetry, incident, deployment, and workload trace links for root-cause analysis."),
-        ("GitOps Promotion", "gitops_plan.json", "Environment promotion plan with Argo CD, progressive delivery, and rollback controls."),
+        ("Orchestration Scorecard", "orchestration_scorecard.json", "Automated scan of advanced Airflow, Kubernetes, lineage, and security controls."),
     ]
     card_html = "\n".join(
         f"""

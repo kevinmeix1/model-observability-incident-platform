@@ -68,6 +68,8 @@ For the Kubernetes/Airflow robustness layer, see [Kubernetes and Airflow robustn
 
 For the operator-facing reliability planner, see [advanced reliability control plane](docs/control-plane-depth.md).
 
+For the policy-as-code audit layer, see [security and governance](docs/security-governance.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

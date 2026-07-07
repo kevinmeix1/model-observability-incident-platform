@@ -1,0 +1,43 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: require-observability-runtime-guardrails
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: "object.spec.containers.all(c, has(c.resources.requests) && has(c.resources.limits))"
+      message: "Observability containers must define resource requests and limits."
+    - expression: "object.spec.containers.all(c, has(c.securityContext) && c.securityContext.allowPrivilegeEscalation == false)"
+      message: "Privilege escalation must be disabled."
+    - expression: "object.spec.containers.all(c, has(c.securityContext) && c.securityContext.readOnlyRootFilesystem == true)"
+      message: "Observability pods should use read-only root filesystems."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: require-observability-runtime-guardrails
+spec:
+  policyName: require-observability-runtime-guardrails
+  validationActions: ["Deny", "Audit"]
+---
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: require-signed-immutable-observability-images
+spec:
+  matchImageReferences:
+    - glob: ghcr.io/kevinmeix1/model-observability-incident-platform*
+  validationConfigurations:
+    mutateDigest: true
+    verifyDigest: true
+    required: true
+  attestations:
+    - name: slsa-provenance
+      intoto:
+        type: https://slsa.dev/provenance/v1

@@ -8,6 +8,7 @@ from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cli import demo
 from model_observability_platform.incidents import create_incidents
 from model_observability_platform.io import read_csv, write_json
+from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.telemetry import generate_window
 
@@ -61,6 +62,20 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["ScaledJob", "kafka", "lagThreshold", "limitToPartitionsWithLag", "observability-checks-queue"]:
             self.assertIn(expected, autoscaling)
+
+    def test_admission_policies_and_policy_audit_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        admission = (repo / "kubernetes" / "admission-policies.yaml").read_text(encoding="utf-8")
+
+        for expected in ["ValidatingAdmissionPolicy", "ValidatingAdmissionPolicyBinding", "ImageValidatingPolicy", "slsa-provenance"]:
+            self.assertIn(expected, admission)
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit_platform_policy(repo, output_root=tmp)
+            passed = {check["name"] for check in report["checks"] if check["passed"]}
+            self.assertIn("incident_priority", passed)
+            self.assertIn("event_driven_scaling", passed)
+            self.assertIn("no_latest_image_tags", report["failed_checks"])
+            self.assertIn("immutable_image_digest", report["failed_checks"])
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,4 +1,4 @@
-.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan kubernetes-plan minikube-up test clean
+.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan kubernetes-plan minikube-up test clean
 
 demo:
 	PYTHONPATH=src python3 -m model_observability_platform demo --output .local
@@ -24,6 +24,9 @@ network-security:
 gitops-plan:
 	PYTHONPATH=src python3 -m model_observability_platform gitops-plan --output .local
 
+dr-plan:
+	PYTHONPATH=src python3 -m model_observability_platform dr-plan --output .local
+
 kubernetes-plan:
 	@find kubernetes gitops -name '*.yaml' -maxdepth 3 -print
 
@@ -34,6 +37,7 @@ minikube-up:
 	@echo "  kubectl apply -f kubernetes/resource-optimization.yaml"
 	@echo "  kubectl apply -f kubernetes/network-security.yaml"
 	@echo "  kubectl apply -f kubernetes/chaos-experiments.yaml"
+	@echo "  kubectl apply -f kubernetes/disaster-recovery.yaml"
 	@echo "  kubectl apply -f gitops/gitops-promotion.yaml"
 
 test:

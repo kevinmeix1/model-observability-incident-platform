@@ -7,6 +7,7 @@ from pathlib import Path
 from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cli import demo
+from model_observability_platform.disaster_recovery import build_disaster_recovery_plan
 from model_observability_platform.gitops_release import build_gitops_plan
 from model_observability_platform.incidents import create_incidents
 from model_observability_platform.io import read_csv, write_json
@@ -150,6 +151,20 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("incident SLO", plan["progressive_delivery"])
             self.assertTrue(any("burn-rate" in gate for gate in plan["gates"]))
             self.assertTrue((Path(tmp) / "reports" / "gitops_plan.json").exists())
+
+    def test_disaster_recovery_plan_and_backup_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        dr = (repo / "kubernetes" / "disaster-recovery.yaml").read_text(encoding="utf-8")
+
+        for expected in ["kind: Schedule", "BackupStorageLocation", "VolumeSnapshotClass", "restore-order"]:
+            self.assertIn(expected, dr)
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = build_disaster_recovery_plan(tmp)
+
+            self.assertLessEqual(plan["rpo_minutes"], 15)
+            self.assertEqual(plan["restore_sequence"][0]["asset"], "namespace and observability CRDs")
+            self.assertTrue(any(item["asset"] == "incident records" for item in plan["restore_sequence"]))
+            self.assertTrue((Path(tmp) / "reports" / "disaster_recovery_plan.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -7,6 +7,7 @@ from pathlib import Path
 from .chaos import run_chaos_drill
 from .checks import run_checks
 from .dashboard import render_dashboard
+from .disaster_recovery import build_disaster_recovery_plan
 from .gitops_release import build_gitops_plan
 from .incidents import create_incidents
 from .io import read_csv, write_json
@@ -32,6 +33,7 @@ def demo(output: str | Path) -> dict:
     resource_optimization = build_resource_optimization_report(root)
     network_security = build_network_security_report(root)
     gitops_plan = build_gitops_plan(root)
+    disaster_recovery = build_disaster_recovery_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -48,6 +50,7 @@ def demo(output: str | Path) -> dict:
         "resource_optimization": resource_optimization,
         "network_security": network_security,
         "gitops_plan": gitops_plan,
+        "disaster_recovery": disaster_recovery,
         "dashboard": str(dashboard),
     }
 
@@ -55,7 +58,7 @@ def demo(output: str | Path) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Model observability and incident response platform")
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ["demo", "reliability-plan", "policy-audit", "trace-report", "chaos-drill", "optimize-resources", "network-security", "gitops-plan"]:
+    for command in ["demo", "reliability-plan", "policy-audit", "trace-report", "chaos-drill", "optimize-resources", "network-security", "gitops-plan", "dr-plan"]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
     args = parser.parse_args(argv)
@@ -75,4 +78,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_network_security_report(args.output), indent=2, sort_keys=True))
     elif args.command == "gitops-plan":
         print(json.dumps(build_gitops_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "dr-plan":
+        print(json.dumps(build_disaster_recovery_plan(args.output), indent=2, sort_keys=True))
     return 0

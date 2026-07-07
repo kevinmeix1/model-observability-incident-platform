@@ -9,6 +9,7 @@ from .checks import run_checks
 from .dashboard import render_dashboard
 from .disaster_recovery import build_disaster_recovery_plan
 from .gitops_release import build_gitops_plan
+from .governance import build_governance_bundle
 from .incidents import create_incidents
 from .io import read_csv, write_json
 from .network_security import build_network_security_report
@@ -34,6 +35,7 @@ def demo(output: str | Path) -> dict:
     network_security = build_network_security_report(root)
     gitops_plan = build_gitops_plan(root)
     disaster_recovery = build_disaster_recovery_plan(root)
+    governance_bundle = build_governance_bundle(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -51,14 +53,38 @@ def demo(output: str | Path) -> dict:
         "network_security": network_security,
         "gitops_plan": gitops_plan,
         "disaster_recovery": disaster_recovery,
+        "governance_bundle": governance_bundle,
         "dashboard": str(dashboard),
     }
+
+
+def governance(output: str | Path) -> dict:
+    root = Path(output)
+    if not (root / "reports" / "observability_report.json").exists():
+        reference_path = generate_window(root / "data" / "reference.csv", window="reference", drift=False, errors=False)
+        current_path = generate_window(root / "data" / "current.csv", window="current", drift=True, errors=True)
+        report = run_checks(read_csv(reference_path), read_csv(current_path))
+        write_json(root / "reports" / "observability_report.json", report)
+        create_incidents(root, report)
+        build_reliability_plan(root)
+    return build_governance_bundle(root)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Model observability and incident response platform")
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ["demo", "reliability-plan", "policy-audit", "trace-report", "chaos-drill", "optimize-resources", "network-security", "gitops-plan", "dr-plan"]:
+    for command in [
+        "demo",
+        "reliability-plan",
+        "policy-audit",
+        "trace-report",
+        "chaos-drill",
+        "optimize-resources",
+        "network-security",
+        "gitops-plan",
+        "dr-plan",
+        "governance-bundle",
+    ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
     args = parser.parse_args(argv)
@@ -80,4 +106,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_gitops_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "dr-plan":
         print(json.dumps(build_disaster_recovery_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "governance-bundle":
+        print(json.dumps(governance(args.output), indent=2, sort_keys=True))
     return 0

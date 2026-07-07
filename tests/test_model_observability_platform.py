@@ -9,8 +9,9 @@ from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cli import demo
 from model_observability_platform.disaster_recovery import build_disaster_recovery_plan
 from model_observability_platform.gitops_release import build_gitops_plan
+from model_observability_platform.governance import build_governance_bundle
 from model_observability_platform.incidents import create_incidents
-from model_observability_platform.io import read_csv, write_json
+from model_observability_platform.io import read_csv, read_json, write_json
 from model_observability_platform.network_security import build_network_security_report
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
@@ -80,8 +81,8 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             passed = {check["name"] for check in report["checks"] if check["passed"]}
             self.assertIn("incident_priority", passed)
             self.assertIn("event_driven_scaling", passed)
+            self.assertIn("immutable_image_digest", passed)
             self.assertIn("no_latest_image_tags", report["failed_checks"])
-            self.assertIn("immutable_image_digest", report["failed_checks"])
 
     def test_trace_report_and_otel_collector_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -165,6 +166,25 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(plan["restore_sequence"][0]["asset"], "namespace and observability CRDs")
             self.assertTrue(any(item["asset"] == "incident records" for item in plan["restore_sequence"]))
             self.assertTrue((Path(tmp) / "reports" / "disaster_recovery_plan.json").exists())
+
+    def test_governance_evidence_bundle_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        governance = (repo / "kubernetes" / "governance-evidence.yaml").read_text(encoding="utf-8")
+
+        for expected in ["kind: ConfigMap", "kind: Job", "model-card", "risk-register", "reproducibility-manifest"]:
+            self.assertIn(expected, governance)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            bundle = build_governance_bundle(root)
+            approval = read_json(root / "governance" / "approval_record.json")
+            manifest = read_json(root / "governance" / "reproducibility_manifest.json")
+
+            self.assertEqual(result["governance_bundle"]["release"]["decision"], "incident_review_required")
+            self.assertEqual(bundle["release"]["system_name"], "model-observability-policy")
+            self.assertEqual(approval["severity"], "high")
+            self.assertTrue(any(item["exists"] and len(item["sha256"]) == 64 for item in manifest["artifact_hashes"]))
+            self.assertTrue((root / "reports" / "governance_evidence_bundle.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

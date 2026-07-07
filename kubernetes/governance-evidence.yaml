@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-observability-governance-policy
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/name: governance-evidence
+    app.kubernetes.io/part-of: model-observability-incident-platform
+data:
+  required_evidence: |
+    - model-card
+    - data-card
+    - risk-register
+    - approval-record
+    - reproducibility-manifest
+  promotion_policy: |
+    reliability approval requires drift report, incident dedupe evidence, burn-rate action, and telemetry baseline hashes
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-observability-evidence-bundle
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/name: governance-evidence
+spec:
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: governance-evidence
+    spec:
+      restartPolicy: Never
+      serviceAccountName: observability-runner
+      containers:
+        - name: evidence
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform@sha256:replace-with-built-image-digest
+          command: ["python", "-m", "model_observability_platform", "governance-bundle", "--output", "/workspace"]
+          env:
+            - name: REQUIRED_EVIDENCE
+              value: "model-card,data-card,risk-register,approval-record,reproducibility-manifest"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: model-observability-weekly-governance-review
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/name: governance-evidence
+spec:
+  schedule: "0 9 * * 1"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: review
+              image: ghcr.io/kevinmeix1/model-observability-incident-platform@sha256:replace-with-built-image-digest
+              command: ["python", "-m", "model_observability_platform", "governance-bundle", "--output", "/workspace"]
+              resources:
+                requests:
+                  cpu: "250m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "1"
+                  memory: "1Gi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true

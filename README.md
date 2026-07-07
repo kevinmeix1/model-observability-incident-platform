@@ -82,6 +82,8 @@ For auditable environment promotion with Argo CD and Argo Rollouts, see [GitOps 
 
 For backup schedules, restore order, and RPO/RTO evidence, see [disaster recovery](docs/disaster-recovery.md).
 
+For reliability system cards, telemetry data cards, incident approval records, risk controls, and reproducibility hashes, see [governance evidence](docs/governance-evidence.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

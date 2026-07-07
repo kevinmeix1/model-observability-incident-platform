@@ -64,6 +64,8 @@ See [production-grade refinements](docs/production-grade-refinements.md) for the
 
 For the latest reliability control-plane pass, see [advanced orchestration assessment](docs/advanced-orchestration-assessment.md).
 
+For the Kubernetes/Airflow robustness layer, see [Kubernetes and Airflow robustness](docs/kubernetes-airflow-robustness.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

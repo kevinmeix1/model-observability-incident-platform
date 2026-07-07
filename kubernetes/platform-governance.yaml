@@ -1,0 +1,57 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: observability-incident-priority
+value: 90000
+globalDefault: false
+description: "Priority for model observability cycles and incident creation."
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: observability-compute-quota
+  namespace: ml-observability
+spec:
+  hard:
+    requests.cpu: "6"
+    requests.memory: 12Gi
+    limits.cpu: "12"
+    limits.memory: 24Gi
+    pods: "40"
+    count/jobs.batch: "30"
+    count/cronjobs.batch: "8"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: observability-default-limits
+  namespace: ml-observability
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "1"
+        memory: 1Gi
+      defaultRequest:
+        cpu: 250m
+        memory: 512Mi
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-observability-dashboard-route
+  namespace: ml-observability
+spec:
+  parentRefs:
+    - name: internal-ml-gateway
+      namespace: platform-ingress
+  hostnames:
+    - model-observability.internal.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: model-observability-dashboard
+          port: 8080

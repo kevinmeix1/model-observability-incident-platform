@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-observability-error-budget-policy
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/name: slo-error-budget
+data:
+  policy: |
+    multiwindow burn alerts:
+      fast_page: 14.4 burn over 5m and 1h
+      slow_page: 6.0 burn over 30m and 6h
+      ticket: 1.0 burn over 6h and 3d
+    release freeze:
+      freeze model rollouts when reliability or telemetry SLOs breach
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: model-observability-slo-burn-rate
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/name: slo-error-budget
+spec:
+  groups:
+    - name: model-observability.slo.multiwindow
+      rules:
+        - alert: SLOBurnRateHigh
+          expr: |
+            (
+              sum(rate(model_serving_errors_total[5m])) / sum(rate(model_serving_requests_total[5m])) > (14.4 * 0.005)
+            )
+            and
+            (
+              sum(rate(model_serving_errors_total[1h])) / sum(rate(model_serving_requests_total[1h])) > (14.4 * 0.005)
+            )
+          for: 2m
+          labels:
+            severity: page
+            slo: observed_serving_availability
+          annotations:
+            summary: "Observed model serving is burning error budget too quickly"
+            runbook: "docs/slo-error-budget.md"
+        - alert: SLOTelemetryFreshnessBreach
+          expr: model_telemetry_freshness_minutes > 20
+          for: 15m
+          labels:
+            severity: page
+            slo: telemetry_freshness
+          annotations:
+            summary: "Model telemetry freshness SLO breached"
+            runbook: "docs/slo-error-budget.md"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: model-observability-error-budget-freeze-sync
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/name: slo-error-budget
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: sync
+              image: ghcr.io/kevinmeix1/model-observability-incident-platform@sha256:replace-with-built-image-digest
+              command: ["python", "-m", "model_observability_platform", "slo-report", "--output", "/workspace"]
+              env:
+                - name: MODEL_ROLLOUT_FREEZE_VARIABLE
+                  value: "model_rollout_freeze"
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true

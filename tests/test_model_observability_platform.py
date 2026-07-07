@@ -16,6 +16,7 @@ from model_observability_platform.network_security import build_network_security
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
+from model_observability_platform.slo import build_slo_report
 from model_observability_platform.telemetry import generate_window
 from model_observability_platform.traceability import build_trace_report
 
@@ -185,6 +186,22 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(approval["severity"], "high")
             self.assertTrue(any(item["exists"] and len(item["sha256"]) == 64 for item in manifest["artifact_hashes"]))
             self.assertTrue((root / "reports" / "governance_evidence_bundle.json").exists())
+
+    def test_slo_error_budget_report_and_alert_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        alerts = (repo / "kubernetes" / "slo-alerts.yaml").read_text(encoding="utf-8")
+
+        for expected in ["PrometheusRule", "SLOBurnRateHigh", "multiwindow", "error-budget-freeze"]:
+            self.assertIn(expected, alerts)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            report = build_slo_report(root)
+
+            self.assertEqual(result["slo_error_budget"]["recommended_action"], "freeze_rollouts_and_page")
+            self.assertEqual(report["slos"][0]["name"], "observed_serving_availability")
+            self.assertEqual(report["reliability_action"], "page_and_freeze_rollouts")
+            self.assertTrue((root / "reports" / "slo_error_budget.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -16,6 +16,7 @@ from .network_security import build_network_security_report
 from .policy_audit import audit_platform_policy
 from .reliability_control import build_reliability_plan
 from .resource_optimizer import build_resource_optimization_report
+from .slo import build_slo_report
 from .telemetry import generate_window
 from .traceability import build_trace_report
 
@@ -36,6 +37,7 @@ def demo(output: str | Path) -> dict:
     gitops_plan = build_gitops_plan(root)
     disaster_recovery = build_disaster_recovery_plan(root)
     governance_bundle = build_governance_bundle(root)
+    slo_error_budget = build_slo_report(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -54,6 +56,7 @@ def demo(output: str | Path) -> dict:
         "gitops_plan": gitops_plan,
         "disaster_recovery": disaster_recovery,
         "governance_bundle": governance_bundle,
+        "slo_error_budget": slo_error_budget,
         "dashboard": str(dashboard),
     }
 
@@ -70,6 +73,13 @@ def governance(output: str | Path) -> dict:
     return build_governance_bundle(root)
 
 
+def slo_report(output: str | Path) -> dict:
+    root = Path(output)
+    if not (root / "reports" / "reliability_control_plan.json").exists():
+        governance(root)
+    return build_slo_report(root)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Model observability and incident response platform")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -84,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         "gitops-plan",
         "dr-plan",
         "governance-bundle",
+        "slo-report",
     ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
@@ -108,4 +119,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_disaster_recovery_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "governance-bundle":
         print(json.dumps(governance(args.output), indent=2, sort_keys=True))
+    elif args.command == "slo-report":
+        print(json.dumps(slo_report(args.output), indent=2, sort_keys=True))
     return 0

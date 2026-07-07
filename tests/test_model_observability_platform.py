@@ -18,6 +18,7 @@ from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.slo import build_slo_report
+from model_observability_platform.supply_chain import build_supply_chain_evidence
 from model_observability_platform.telemetry import generate_window
 from model_observability_platform.traceability import build_trace_report
 
@@ -227,10 +228,32 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         workflow = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         makefile = (repo / "Makefile").read_text(encoding="utf-8")
 
-        for expected in ["actions/upload-artifact@v6", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
+        for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
+
+    def test_supply_chain_evidence_and_policy_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        policy = (repo / "kubernetes" / "supply-chain-policy.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "reports" / "demo.json", {"status": "ok"})
+            evidence = build_supply_chain_evidence(
+                root,
+                project="Model Observability Incident Platform",
+                artifact_name="model-observability-demo-artifacts",
+                workflow="Model Observability CI",
+                namespace="mlops-observability",
+            )
+
+            self.assertEqual(evidence["artifact_count"], 1)
+            self.assertEqual(len(evidence["artifacts"][0]["sha256"]), 64)
+            self.assertEqual(evidence["subject"]["attestation_action"], "actions/attest@v4")
+            self.assertTrue((root / "supply-chain" / "subject.checksums.txt").exists())
+            self.assertIn("ClusterImagePolicy", policy)
+            self.assertIn("predicateType: https://slsa.dev/provenance/v1", policy)
+            self.assertIn("policy.sigstore.dev/include", policy)
 
     def test_artifact_index_links_key_reports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -245,6 +268,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "reliability_control_plan.json",
                 "governance_evidence_bundle.json",
                 "slo_error_budget.json",
+                "supply_chain_evidence.json",
                 "cloud_migration_plan.json",
             ]:
                 self.assertIn(expected, index)
@@ -278,6 +302,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertGreaterEqual(result["incidents"]["open_count"], 4)
             self.assertTrue((root / "reports" / "model_observability_dashboard.html").exists())
             self.assertTrue((root / "reports" / "index.html").exists())
+            self.assertTrue((root / "reports" / "supply_chain_evidence.json").exists())
 
     def test_clean_window_passes_checks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -72,6 +72,8 @@ For the policy-as-code audit layer, see [security and governance](docs/security-
 
 For OpenTelemetry-style runtime traces, see [observability and tracing](docs/observability-tracing.md).
 
+For controlled failure injection and recovery objectives, see [resilience and chaos drills](docs/resilience-chaos.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

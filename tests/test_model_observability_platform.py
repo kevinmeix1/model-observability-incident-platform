@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cli import demo
 from model_observability_platform.incidents import create_incidents
@@ -90,6 +91,20 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((Path(tmp) / "reports" / "trace_report.json").exists())
         for expected in ["kind: ConfigMap", "otlp", "k8sattributes", "memory_limiter", "prometheus", "batch"]:
             self.assertIn(expected, collector)
+
+    def test_chaos_drill_and_chaos_mesh_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        chaos_manifest = (repo / "kubernetes" / "chaos-experiments.yaml").read_text(encoding="utf-8")
+
+        for expected in ["PodChaos", "NetworkChaos", "StressChaos", "Schedule", "concurrencyPolicy: Forbid", "observability-collector-pod-kill"]:
+            self.assertIn(expected, chaos_manifest)
+        with tempfile.TemporaryDirectory() as tmp:
+            report = run_chaos_drill(tmp)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["scenario_count"], 3)
+            self.assertTrue(any(scenario["fault"] == "NetworkChaos" for scenario in report["scenarios"]))
+            self.assertTrue((Path(tmp) / "reports" / "chaos_drill_report.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

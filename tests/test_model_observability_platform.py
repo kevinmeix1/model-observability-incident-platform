@@ -6,6 +6,7 @@ from pathlib import Path
 
 from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
+from model_observability_platform.cloud_migration import build_cloud_migration_plan
 from model_observability_platform.cli import demo
 from model_observability_platform.disaster_recovery import build_disaster_recovery_plan
 from model_observability_platform.gitops_release import build_gitops_plan
@@ -202,6 +203,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(report["slos"][0]["name"], "observed_serving_availability")
             self.assertEqual(report["reliability_action"], "page_and_freeze_rollouts")
             self.assertTrue((root / "reports" / "slo_error_budget.json").exists())
+
+    def test_cloud_migration_plan_and_infra_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        nodepools = (repo / "kubernetes" / "cloud-nodepools.yaml").read_text(encoding="utf-8")
+        terraform = (repo / "infra" / "terraform" / "aws" / "main.tf").read_text(encoding="utf-8")
+
+        for expected in ["NodePool", "EC2NodeClass", "WhenEmptyOrUnderutilized"]:
+            self.assertIn(expected, nodepools)
+        for expected in ["cluster_compute_config", "node_pools", "aws_s3_bucket"]:
+            self.assertIn(expected, terraform)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            plan = build_cloud_migration_plan(root)
+
+            self.assertEqual(result["cloud_migration"]["primary_target"], "AWS EKS Auto Mode")
+            self.assertEqual(plan["managed_service_mapping"]["monitoring"], "Amazon Managed Service for Prometheus and Grafana")
+            self.assertTrue((root / "reports" / "cloud_migration_plan.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

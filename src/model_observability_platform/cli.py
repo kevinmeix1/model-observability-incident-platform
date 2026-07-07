@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .chaos import run_chaos_drill
 from .checks import run_checks
+from .cloud_migration import build_cloud_migration_plan
 from .dashboard import render_dashboard
 from .disaster_recovery import build_disaster_recovery_plan
 from .gitops_release import build_gitops_plan
@@ -38,6 +39,7 @@ def demo(output: str | Path) -> dict:
     disaster_recovery = build_disaster_recovery_plan(root)
     governance_bundle = build_governance_bundle(root)
     slo_error_budget = build_slo_report(root)
+    cloud_migration = build_cloud_migration_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -57,6 +59,7 @@ def demo(output: str | Path) -> dict:
         "disaster_recovery": disaster_recovery,
         "governance_bundle": governance_bundle,
         "slo_error_budget": slo_error_budget,
+        "cloud_migration": cloud_migration,
         "dashboard": str(dashboard),
     }
 
@@ -95,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         "dr-plan",
         "governance-bundle",
         "slo-report",
+        "cloud-plan",
     ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
@@ -121,4 +125,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(governance(args.output), indent=2, sort_keys=True))
     elif args.command == "slo-report":
         print(json.dumps(slo_report(args.output), indent=2, sort_keys=True))
+    elif args.command == "cloud-plan":
+        print(json.dumps(build_cloud_migration_plan(args.output), indent=2, sort_keys=True))
     return 0

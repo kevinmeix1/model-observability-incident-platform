@@ -86,6 +86,8 @@ For reliability system cards, telemetry data cards, incident approval records, r
 
 For model reliability SLOs, burn-rate alerts, and rollout-freeze automation, see [SLO and error budget automation](docs/slo-error-budget.md).
 
+For EKS Auto Mode, Terraform, managed-service mappings, and portability notes, see [cloud migration](docs/cloud-migration.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

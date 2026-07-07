@@ -7,6 +7,7 @@ from pathlib import Path
 from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cli import demo
+from model_observability_platform.gitops_release import build_gitops_plan
 from model_observability_platform.incidents import create_incidents
 from model_observability_platform.io import read_csv, write_json
 from model_observability_platform.network_security import build_network_security_report
@@ -135,6 +136,20 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(report["allowed_flow_count"], 3)
             self.assertTrue(any(flow["destination"] == "telemetry-collector" for flow in report["allowed_flows"]))
             self.assertTrue((Path(tmp) / "reports" / "network_security.json").exists())
+
+    def test_gitops_plan_and_progressive_delivery_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        gitops = (repo / "gitops" / "gitops-promotion.yaml").read_text(encoding="utf-8")
+
+        for expected in ["kind: Application", "kind: AppProject", "AnalysisTemplate", "Rollout", "argocd.argoproj.io/sync-wave"]:
+            self.assertIn(expected, gitops)
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = build_gitops_plan(tmp)
+
+            self.assertEqual(plan["deployment_controller"], "Argo CD")
+            self.assertIn("incident SLO", plan["progressive_delivery"])
+            self.assertTrue(any("burn-rate" in gate for gate in plan["gates"]))
+            self.assertTrue((Path(tmp) / "reports" / "gitops_plan.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

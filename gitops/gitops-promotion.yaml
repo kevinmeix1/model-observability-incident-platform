@@ -1,0 +1,124 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: observability-platforms
+  namespace: argocd
+spec:
+  description: Model observability and incident platforms
+  destinations:
+    - namespace: ml-observability
+      server: https://kubernetes.default.svc
+  sourceRepos:
+    - https://github.com/kevinmeix1/model-observability-incident-platform.git
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: model-observability-incident-platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: observability-platforms
+  source:
+    repoURL: https://github.com/kevinmeix1/model-observability-incident-platform.git
+    targetRevision: main
+    path: kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ml-observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PruneLast=true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: observability-pre-sync-gates
+  namespace: ml-observability
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: observability-gates
+          image: python:3.12-slim
+          command: ["python", "-c", "print('validate telemetry schema, incident dedupe, and network topology before sync')"]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: observability-reliability-analysis
+  namespace: ml-observability
+spec:
+  metrics:
+    - name: telemetry-freshness
+      interval: 2m
+      count: 3
+      successCondition: result[0] < 10
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc.cluster.local:9090
+          query: max(time() - model_prediction_latest_timestamp_seconds) / 60
+    - name: incident-burn-rate
+      interval: 2m
+      count: 3
+      successCondition: result[0] < 6
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc.cluster.local:9090
+          query: model_error_budget_burn_rate
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: observability-control-plane
+  namespace: ml-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: observability-control-plane
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: observability-control-plane
+    spec:
+      containers:
+        - name: controller
+          image: ghcr.io/kevinmeix1/observability-control-plane:2026.07.0
+          ports:
+            - containerPort: 8080
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - analysis:
+            templates:
+              - templateName: observability-reliability-analysis
+        - pause:
+            duration: 5m
+        - setWeight: 100

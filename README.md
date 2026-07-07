@@ -78,6 +78,8 @@ For workload right-sizing, HPA/VPA guardrails, and Airflow pool sizing, see [res
 
 For runtime network boundaries, mTLS, and allow-listed service flows, see [network security](docs/network-security.md).
 
+For auditable environment promotion with Argo CD and Argo Rollouts, see [GitOps promotion](docs/gitops-promotion.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

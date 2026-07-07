@@ -74,6 +74,8 @@ For OpenTelemetry-style runtime traces, see [observability and tracing](docs/obs
 
 For controlled failure injection and recovery objectives, see [resilience and chaos drills](docs/resilience-chaos.md).
 
+For workload right-sizing, HPA/VPA guardrails, and Airflow pool sizing, see [resource optimization](docs/resource-optimization.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

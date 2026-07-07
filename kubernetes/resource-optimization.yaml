@@ -1,0 +1,98 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: telemetry-collector-vpa-recommender
+  namespace: ml-observability
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: telemetry-collector
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: "*"
+        controlledResources: ["cpu", "memory"]
+        minAllowed:
+          cpu: 350m
+          memory: 512Mi
+        maxAllowed:
+          cpu: "2"
+          memory: 2Gi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: telemetry-collector-hpa
+  namespace: ml-observability
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: telemetry-collector
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: AverageValue
+          averageValue: 704Mi
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 180
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-capacity-pools
+  namespace: ml-observability
+data:
+  pools.json: |
+    [
+      {"name": "incident_creation", "slots": 3, "description": "Reserve capacity for incident creation and dedupe"},
+      {"name": "drift_reports", "slots": 2, "description": "Bound expensive drift report generation"},
+      {"name": "freshness_checks", "slots": 4, "description": "Keep freshness checks responsive during incidents"}
+    ]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-resource-optimization-alerts
+  namespace: ml-observability
+spec:
+  groups:
+    - name: observability.resource.optimization
+      rules:
+        - alert: CollectorMemoryPressure
+          expr: container_memory_working_set_bytes{namespace="ml-observability", pod=~"telemetry-collector.*"} / container_spec_memory_limit_bytes > 0.8
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Collector memory pressure is high; review VPA recommendation before dropping telemetry."
+        - alert: IncidentPoolSaturation
+          expr: airflow_pool_queued_slots{pool="incident_creation"} > 0
+          for: 5m
+          labels:
+            severity: high
+          annotations:
+            summary: "Incident creation is queueing; reserve more pool slots before running noncritical drift reports."

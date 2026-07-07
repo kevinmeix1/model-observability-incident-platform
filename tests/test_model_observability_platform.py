@@ -11,6 +11,7 @@ from model_observability_platform.incidents import create_incidents
 from model_observability_platform.io import read_csv, write_json
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
+from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.telemetry import generate_window
 from model_observability_platform.traceability import build_trace_report
 
@@ -105,6 +106,20 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(report["scenario_count"], 3)
             self.assertTrue(any(scenario["fault"] == "NetworkChaos" for scenario in report["scenarios"]))
             self.assertTrue((Path(tmp) / "reports" / "chaos_drill_report.json").exists())
+
+    def test_resource_optimization_and_autoscaling_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        optimization = (repo / "kubernetes" / "resource-optimization.yaml").read_text(encoding="utf-8")
+
+        for expected in ["VerticalPodAutoscaler", "HorizontalPodAutoscaler", "PrometheusRule", "airflow-capacity-pools", "stabilizationWindowSeconds: 300"]:
+            self.assertIn(expected, optimization)
+        with tempfile.TemporaryDirectory() as tmp:
+            report = build_resource_optimization_report(tmp)
+
+            self.assertEqual(report["summary"]["workload_count"], 3)
+            self.assertIn("incident creation", " ".join(report["guardrails"]))
+            self.assertTrue(any("prewarm_replicas" in item["actions"] for item in report["recommendations"]))
+            self.assertTrue((Path(tmp) / "reports" / "resource_optimization.json").exists())
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

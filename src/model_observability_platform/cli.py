@@ -11,6 +11,7 @@ from .incidents import create_incidents
 from .io import read_csv, write_json
 from .policy_audit import audit_platform_policy
 from .reliability_control import build_reliability_plan
+from .resource_optimizer import build_resource_optimization_report
 from .telemetry import generate_window
 from .traceability import build_trace_report
 
@@ -26,6 +27,7 @@ def demo(output: str | Path) -> dict:
     policy_audit = audit_platform_policy(Path.cwd(), output_root=root)
     trace_report = build_trace_report(root)
     chaos_drill = run_chaos_drill(root)
+    resource_optimization = build_resource_optimization_report(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -39,6 +41,7 @@ def demo(output: str | Path) -> dict:
         "policy_audit": policy_audit,
         "trace_report": trace_report,
         "chaos_drill": chaos_drill,
+        "resource_optimization": resource_optimization,
         "dashboard": str(dashboard),
     }
 
@@ -46,7 +49,7 @@ def demo(output: str | Path) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Model observability and incident response platform")
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ["demo", "reliability-plan", "policy-audit", "trace-report", "chaos-drill"]:
+    for command in ["demo", "reliability-plan", "policy-audit", "trace-report", "chaos-drill", "optimize-resources"]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
     args = parser.parse_args(argv)
@@ -60,4 +63,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_trace_report(args.output), indent=2, sort_keys=True))
     elif args.command == "chaos-drill":
         print(json.dumps(run_chaos_drill(args.output), indent=2, sort_keys=True))
+    elif args.command == "optimize-resources":
+        print(json.dumps(build_resource_optimization_report(args.output), indent=2, sort_keys=True))
     return 0

@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .artifact_index import render_artifact_index
 from .chaos import run_chaos_drill
 from .checks import run_checks
 from .cloud_migration import build_cloud_migration_plan
@@ -46,6 +47,12 @@ def demo(output: str | Path) -> dict:
         incident_summary=incident_summary,
         reliability_plan=reliability_plan,
     )
+    artifact_index = render_artifact_index(
+        root,
+        title="Model Observability Incident Platform",
+        description="Reviewer landing page for generated reliability dashboard, incident evidence, SLOs, migration, and governance artifacts.",
+        dashboard="model_observability_dashboard.html",
+    )
     return {
         "report": report,
         "incidents": incident_summary,
@@ -61,6 +68,7 @@ def demo(output: str | Path) -> dict:
         "slo_error_budget": slo_error_budget,
         "cloud_migration": cloud_migration,
         "dashboard": str(dashboard),
+        "artifact_index": str(artifact_index),
     }
 
 

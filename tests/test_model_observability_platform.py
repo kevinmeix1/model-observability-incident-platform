@@ -229,8 +229,25 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
+
+    def test_artifact_index_links_key_reports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            index = (root / "reports" / "index.html").read_text(encoding="utf-8")
+
+            self.assertTrue(result["artifact_index"].endswith("index.html"))
+            for expected in [
+                "model_observability_dashboard.html",
+                "incident_summary.json",
+                "reliability_control_plan.json",
+                "governance_evidence_bundle.json",
+                "slo_error_budget.json",
+                "cloud_migration_plan.json",
+            ]:
+                self.assertIn(expected, index)
 
     def test_reliability_control_escalates_high_burn_incident(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -260,6 +277,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertFalse(result["report"]["passed"])
             self.assertGreaterEqual(result["incidents"]["open_count"], 4)
             self.assertTrue((root / "reports" / "model_observability_dashboard.html").exists())
+            self.assertTrue((root / "reports" / "index.html").exists())
 
     def test_clean_window_passes_checks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

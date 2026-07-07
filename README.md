@@ -62,6 +62,8 @@ open .local/reports/model_observability_dashboard.html
 
 See [production-grade refinements](docs/production-grade-refinements.md) for the PSI drift, SLO, incident dedupe, root-cause, and runbook improvements.
 
+For the latest reliability control-plane pass, see [advanced orchestration assessment](docs/advanced-orchestration-assessment.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

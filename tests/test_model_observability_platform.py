@@ -12,6 +12,19 @@ from model_observability_platform.telemetry import generate_window
 
 
 class ModelObservabilityPlatformTest(unittest.TestCase):
+    def test_advanced_observability_control_plane_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        dag = repo / "airflow" / "dags" / "model_reliability_control_plane_dag.py"
+        workloads = repo / "kubernetes" / "observability-control-plane.yaml"
+
+        dag_text = dag.read_text(encoding="utf-8")
+        workload_text = workloads.read_text(encoding="utf-8")
+
+        for expected in ["KubernetesPodOperator", "task_group", "BranchPythonOperator", "Asset", "expand("]:
+            self.assertIn(expected, dag_text)
+        for expected in ["CronJob", "RoleBinding", "ConfigMap", "PSI_THRESHOLD", "securityContext"]:
+            self.assertIn(expected, workload_text)
+
     def test_demo_creates_incidents_and_dashboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

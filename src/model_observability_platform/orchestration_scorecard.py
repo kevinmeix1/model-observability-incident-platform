@@ -58,6 +58,7 @@ def build_orchestration_scorecard(
         ("inference_gateway_extension", _present(content, "InferencePool", "endpointPickerRef") and _present(content, "InferenceObjective", "inference.networking.k8s.io/v1"), "Gateway API Inference Extension signals are captured in incidents"),
         ("semantic_telemetry_contract", _present(content, "semantic_telemetry_plan.json", "attributes/semantic_redaction") and _present(content, "gen_ai.request.model", "ml.model.version"), "Telemetry spans use portable model, Kubernetes, SLO, and incident attributes with payload redaction"),
         ("airflow_deadline_alerts", _present(content, "deadline_alert_plan.json", "Deadline Alerts") and _present(content, "AIRFLOW__CALLBACKS__CALLBACK_EXECUTION_TIMEOUT"), "Airflow 3 Deadline Alerts cover telemetry freshness, incident creation, root-cause fanout, and dashboard publish windows"),
+        ("opencost_finops", _present(content, "cost_observability_report.json", "OpenCost", "node_gpu_hourly_cost") and _present(content, "ObservabilityIncidentFanoutCostHigh"), "OpenCost and Prometheus budget alerts attribute telemetry, drift, incident fanout, dashboard, retention, and GPU diagnostic spend"),
         ("event_driven_scaling", _present(content, "ScaledObject", "ScaledJob"), "KEDA ScaledObjects or ScaledJobs react to operational backlog"),
         ("horizontal_autoscaling", "HorizontalPodAutoscaler" in content, "HPA rules keep workers and services elastic"),
         ("opentelemetry", _present(content, "opentelemetry-collector", "OpenTelemetry"), "OTel collector config captures runtime traces and metrics"),
@@ -87,6 +88,7 @@ def build_orchestration_scorecard(
             "Gateway API Inference Extension for endpoint-picker health and objective-aware incident context",
             "OpenTelemetry semantic conventions for portable service, Kubernetes, model, and incident attributes",
             "Airflow 3 Deadline Alerts as the replacement for legacy SLA callbacks",
+            "OpenCost exporter metrics for observability incident-path, GPU diagnostic, retention, and dashboard cost allocation",
             "GitHub artifact attestations, SLSA provenance, and Sigstore policy-controller for supply-chain integrity",
         ],
         "next_actions": [

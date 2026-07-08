@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opencost-exporter
+  labels:
+    app.kubernetes.io/name: opencost
+    platform.mlops.dev/owner: platform-finops
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opencost-prometheus-scrape
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: opencost-finops
+    platform.mlops.dev/component: cost-observability
+data:
+  prometheus.yml: |
+    scrape_configs:
+      - job_name: opencost
+        scrape_interval: 1m
+        scrape_timeout: 10s
+        metrics_path: /metrics
+        scheme: http
+        static_configs:
+          - targets:
+              - opencost.opencost-exporter:9003
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-cost-allocation-contract
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: opencost-finops
+    platform.mlops.dev/component: allocation-contract
+data:
+  required-labels: detector,check-name,incident-route,severity,tenant,cost-center,dashboard
+  allocation-dimensions: namespace,detector,check_name,incident_id,incident_route,dashboard,tenant,label_cost_center,label_severity
+  incident-path-cost-query: |
+    sum(container_cpu_allocation * on(node) group_left node_cpu_hourly_cost) by (namespace, label_incident_route, label_severity) * 730
+    + sum(container_memory_allocation_bytes * on(node) group_left node_ram_hourly_cost) by (namespace, label_incident_route, label_severity) * 730 / 1024 / 1024 / 1024
+  diagnostic-gpu-cost-query: |
+    sum(node_gpu_hourly_cost) by (namespace, node, label_incident_route, label_severity) * 730
+  retention-pvc-cost-query: |
+    sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="mlops-observability"}) by (namespace, persistentvolumeclaim) / 1024 / 1024 / 1024
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-cost-observability
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: opencost-finops
+    platform.mlops.dev/component: budget-alerts
+spec:
+  groups:
+    - name: observability.finops.opencost
+      rules:
+        - alert: ObservabilityTelemetryCostBudgetExceeded
+          expr: |
+            sum(container_cpu_allocation{label_incident_route="ingestion"} * on(node) group_left node_cpu_hourly_cost) by (namespace) * 730 > 320
+          for: 30m
+          labels:
+            severity: warning
+            team: ml-observability
+          annotations:
+            summary: Telemetry ingestion cost is projected above the observability budget.
+            runbook_url: docs/cost-observability.md
+        - alert: ObservabilityIncidentFanoutCostHigh
+          expr: |
+            sum(container_cpu_allocation{label_incident_route="diagnostics"} * on(node) group_left node_cpu_hourly_cost) by (namespace) * 730 > 680
+          for: 20m
+          labels:
+            severity: warning
+            team: ml-observability
+          annotations:
+            summary: Root-cause fanout cost is above the incident diagnostics budget.
+            runbook_url: docs/cost-observability.md
+        - alert: ObservabilityIdleGpuDiagnosticSpend
+          expr: |
+            sum(node_gpu_hourly_cost) by (namespace) > 0
+            unless sum(DCGM_FI_DEV_GPU_UTIL{namespace="mlops-observability"}) by (namespace) > 0
+          for: 15m
+          labels:
+            severity: warning
+            team: ml-observability
+          annotations:
+            summary: GPU diagnostic spend is present without matching accelerator utilization.
+            runbook_url: docs/cost-observability.md
+        - alert: ObservabilityCostAllocationLabelMissing
+          expr: |
+            count by (namespace) (
+              kube_pod_info{namespace="mlops-observability"}
+              unless on(namespace, pod) kube_pod_labels{namespace="mlops-observability", label_cost_center!=""}
+            ) > 0
+          for: 10m
+          labels:
+            severity: page
+            team: platform-finops
+          annotations:
+            summary: Observability workload is missing cost allocation labels.
+            runbook_url: docs/cost-observability.md

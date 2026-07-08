@@ -9,6 +9,7 @@ from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cloud_migration import build_cloud_migration_plan
 from model_observability_platform.cli import demo
+from model_observability_platform.cost_observability import build_cost_observability_report
 from model_observability_platform.deadline_alerts import build_deadline_alert_plan
 from model_observability_platform.device_allocation import build_device_allocation_plan
 from model_observability_platform.disaster_recovery import build_disaster_recovery_plan
@@ -312,7 +313,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -434,6 +435,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["Deadline Alerts", "legacy Airflow 2 SLA", "incident", "freshness"]:
             self.assertIn(expected, docs)
 
+    def test_cost_observability_report_and_opencost_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "opencost-finops.yaml").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "cost-observability.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_cost_observability_report(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_observability_opencost_guardrails")
+            self.assertIn("cost_per_high_severity_incident_detected", report["unit_economics"]["primary_kpi"])
+            self.assertTrue(any(item["incident_path"] == "diagnostics" for item in report["observability_budgets"]))
+            self.assertTrue((root / "reports" / "cost_observability_report.json").exists())
+        for expected in ["PrometheusRule", "opencost", "ObservabilityIncidentFanoutCostHigh", "ObservabilityIdleGpuDiagnosticSpend", "label_severity"]:
+            self.assertIn(expected, manifest)
+        for expected in ["OpenCost", "incident", "ResourceQuota", "GPU"]:
+            self.assertIn(expected, docs)
+
     def test_tenancy_fairness_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         manifest = (repo / "kubernetes" / "multitenancy-fairness.yaml").read_text(encoding="utf-8")
@@ -476,6 +495,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("kueue_admission", names)
             self.assertIn("semantic_telemetry_contract", names)
             self.assertIn("airflow_deadline_alerts", names)
+            self.assertIn("opencost_finops", names)
             self.assertIn("supply_chain_provenance", names)
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
@@ -521,6 +541,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "inference_gateway_plan.json",
                 "semantic_telemetry_plan.json",
                 "deadline_alert_plan.json",
+                "cost_observability_report.json",
                 "tenancy_fairness_report.json",
                 "identity_access_report.json",
                 "performance_budget.json",
@@ -572,6 +593,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "inference_gateway_plan.json").exists())
             self.assertTrue((root / "reports" / "semantic_telemetry_plan.json").exists())
             self.assertTrue((root / "reports" / "deadline_alert_plan.json").exists())
+            self.assertTrue((root / "reports" / "cost_observability_report.json").exists())
             self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "identity_access_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())

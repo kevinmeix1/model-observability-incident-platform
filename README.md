@@ -108,6 +108,8 @@ For OTel, Kubernetes, GenAI-style, SLO, and incident telemetry attributes with c
 
 For Airflow 3 telemetry freshness, incident creation, root-cause, and dashboard Deadline Alerts with bounded callbacks, see [Airflow deadline alerts](docs/airflow-deadline-alerts.md).
 
+For OpenCost incident-path budgets, telemetry retention cost, GPU diagnostic spend, and allocation labels, see [cost observability and FinOps](docs/cost-observability.md).
+
 For incident, drift, and retention tenant quotas, Kueue cohorts, Airflow pools, chargeback labels, and noisy-neighbor controls, see [multi-tenant fairness](docs/multi-tenant-fairness.md).
 
 For projected service-account tokens, External Secrets, SPIFFE identities, and keyless observability task access, see [workload identity](docs/workload-identity.md).

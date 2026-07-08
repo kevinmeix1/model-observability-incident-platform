@@ -116,6 +116,8 @@ For Kubernetes pod-level resource envelopes, stable scheduling gates, incident e
 
 For Kueue Fair Sharing, Admission Fair Sharing, incident queue weights, borrowing/lending limits, and preemption guardrails, see [Kueue cohort fair sharing](docs/kueue-cohort-fair-sharing.md).
 
+For Kueue ResourceFlavor fallback, `TryNextFlavor` behavior, and observability spot/on-demand/GPU trade-offs, see [Kueue flavor fungibility](docs/kueue-flavor-fungibility.md).
+
 For Airflow 3 GitDagBundle configuration, DAG versioning, scheduler-managed backfills, and incident replay semantics, see [Airflow DAG Bundles](docs/airflow-dag-bundles.md).
 
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).

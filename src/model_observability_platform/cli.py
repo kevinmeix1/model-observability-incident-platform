@@ -32,6 +32,7 @@ from .inplace_resize import build_inplace_resize_plan
 from .inference_gateway import build_inference_gateway_plan
 from .io import read_csv, write_json
 from .kuberay_capacity import build_kuberay_capacity_plan
+from .multi_team_readiness import build_multi_team_readiness_plan
 from .multikueue_dispatch import build_multikueue_dispatch_plan
 from .network_security import build_network_security_report
 from .orchestration_scorecard import build_orchestration_scorecard
@@ -94,6 +95,7 @@ def demo(output: str | Path) -> dict:
     multikueue_dispatch = build_multikueue_dispatch_plan(root)
     dag_bundle_versioning = build_dag_bundle_versioning_plan(root)
     asset_partitioning = build_asset_partitioning_plan(root)
+    multi_team_readiness = build_multi_team_readiness_plan(root)
     event_driven_assets = build_event_driven_assets_plan(root)
     pod_resource_envelopes = build_pod_resource_envelope_plan(root)
     cohort_fair_sharing = build_cohort_fair_sharing_plan(root)
@@ -172,6 +174,7 @@ def demo(output: str | Path) -> dict:
         "artifact_index": str(artifact_index),
         "orchestration_scorecard": orchestration_scorecard,
         "supply_chain": supply_chain,
+        "multi_team_readiness": multi_team_readiness,
     }
 
 
@@ -230,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
         "multikueue-dispatch",
         "dag-bundle-plan",
         "asset-partitioning-plan",
+        "multi-team-readiness",
         "event-driven-assets",
         "pod-resource-envelopes",
         "cohort-fair-sharing",
@@ -309,6 +313,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_dag_bundle_versioning_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "asset-partitioning-plan":
         print(json.dumps(build_asset_partitioning_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "multi-team-readiness":
+        print(json.dumps(build_multi_team_readiness_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "event-driven-assets":
         print(json.dumps(build_event_driven_assets_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "pod-resource-envelopes":

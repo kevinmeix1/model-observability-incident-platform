@@ -144,6 +144,8 @@ For Kueue `VisibilityOnDemand`, pending workload API queries, incident queue tri
 
 For Kubernetes v1.36 Workload/PodGroup readiness across incident root-cause fanout, drift backlog diagnostics, rollout-freeze smoke, topology constraints, DRA sharing, and workload-aware preemption, see [workload-aware scheduling](docs/workload-aware-scheduling.md).
 
+For Kubernetes v1.36 user namespaces, `hostUsers: false`, fine-grained kubelet authorization, and `nodes/proxy` regression prevention for observability telemetry, see [runtime security](docs/runtime-security.md).
+
 For incident, drift, and retention tenant quotas, Kueue cohorts, Airflow pools, chargeback labels, and noisy-neighbor controls, see [multi-tenant fairness](docs/multi-tenant-fairness.md).
 
 For projected service-account tokens, External Secrets, SPIFFE identities, and keyless observability task access, see [workload identity](docs/workload-identity.md).

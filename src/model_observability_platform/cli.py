@@ -46,6 +46,7 @@ from .release_admission import build_release_admission_decision
 from .reliability_control import build_reliability_plan
 from .resource_health_status import build_resource_health_status_plan
 from .resource_optimizer import build_resource_optimization_report
+from .runtime_security import build_runtime_security_plan
 from .semantic_telemetry import build_semantic_telemetry_plan
 from .slo import build_slo_report
 from .supply_chain import build_supply_chain_evidence
@@ -107,6 +108,7 @@ def demo(output: str | Path) -> dict:
     performance_budget = build_performance_budget_report(root)
     queue_simulation = build_queue_simulation(root)
     workload_aware_scheduling = build_workload_aware_scheduling_plan(root)
+    runtime_security = build_runtime_security_plan(root)
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
@@ -171,6 +173,7 @@ def demo(output: str | Path) -> dict:
         "performance_budget": performance_budget,
         "queue_simulation": queue_simulation,
         "workload_aware_scheduling": workload_aware_scheduling,
+        "runtime_security": runtime_security,
         "incident_evidence_volume": incident_evidence_volume,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
@@ -247,6 +250,7 @@ def main(argv: list[str] | None = None) -> int:
         "performance-budget",
         "queue-simulation",
         "workload-aware-scheduling",
+        "runtime-security",
         "incident-evidence-volumes",
         "release-admission",
     ]:
@@ -339,6 +343,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_queue_simulation(args.output), indent=2, sort_keys=True))
     elif args.command == "workload-aware-scheduling":
         print(json.dumps(build_workload_aware_scheduling_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "runtime-security":
+        print(json.dumps(build_runtime_security_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "incident-evidence-volumes":
         print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":

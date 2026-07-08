@@ -61,6 +61,7 @@ def build_orchestration_scorecard(
         ("opencost_finops", _present(content, "cost_observability_report.json", "OpenCost", "node_gpu_hourly_cost") and _present(content, "ObservabilityIncidentFanoutCostHigh"), "OpenCost and Prometheus budget alerts attribute telemetry, drift, incident fanout, dashboard, retention, and GPU diagnostic spend"),
         ("kueue_elastic_workloads", _present(content, "elastic_workload_plan.json", "ElasticJobsViaWorkloadSlices") and _present(content, "workload-slice-name", "JobSet"), "Kueue Workload Slices and JobSet support elastic incident fanout, drift backlog replacement, and GPU diagnostic bursts"),
         ("indexed_job_resilience", _present(content, "indexed_job_resilience_plan.json", "backoffLimitPerIndex", "podFailurePolicy") and _present(content, "successPolicy", "airflow backfill create"), "Indexed Jobs use per-shard retry budgets, success policy, pod failure policy, and bounded Airflow incident recovery"),
+        ("provisioning_admission_checks", _present(content, "provisioning_admission_plan.json", "ProvisioningRequestConfig", "kueue.x-k8s.io/provisioning-request") and _present(content, "incident_path_prioritized", "check-capacity.autoscaling.x-k8s.io"), "Kueue ProvisioningRequest admission confirms physical capacity for incident diagnostics while fresh alerts stay prioritized"),
         ("event_driven_scaling", _present(content, "ScaledObject", "ScaledJob"), "KEDA ScaledObjects or ScaledJobs react to operational backlog"),
         ("horizontal_autoscaling", "HorizontalPodAutoscaler" in content, "HPA rules keep workers and services elastic"),
         ("opentelemetry", _present(content, "opentelemetry-collector", "OpenTelemetry"), "OTel collector config captures runtime traces and metrics"),
@@ -93,6 +94,7 @@ def build_orchestration_scorecard(
             "OpenCost exporter metrics for observability incident-path, GPU diagnostic, retention, and dashboard cost allocation",
             "Kueue Elastic Workloads with Workload Slices and JobSet integration for dynamic incident fanout and diagnostic scale changes",
             "Kubernetes Indexed Jobs with backoffLimitPerIndex, successPolicy, podFailurePolicy, and Airflow 3 backfill create controls",
+            "Kueue ProvisioningRequest AdmissionChecks for incident diagnostics, GPU drift probes, and rollout-freeze capacity guarantees",
             "GitHub artifact attestations, SLSA provenance, and Sigstore policy-controller for supply-chain integrity",
         ],
         "next_actions": [

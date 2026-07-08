@@ -106,6 +106,8 @@ For Kueue Workload Slices, JobSet incident fanout, drift-backlog replacement sli
 
 For Kubernetes Indexed Jobs, per-index retry budgets, `successPolicy`, `podFailurePolicy`, and Airflow 3 failed-only incident recovery, see [indexed job resilience](docs/indexed-job-resilience.md).
 
+For Kueue ProvisioningRequest admission checks that protect incident diagnostics, rollback-freeze checks, and GPU drift probes, see [provisioning admission](docs/provisioning-admission.md).
+
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).
 
 For OTel, Kubernetes, GenAI-style, SLO, and incident telemetry attributes with collector-side payload redaction, see [semantic telemetry contract](docs/semantic-telemetry.md).

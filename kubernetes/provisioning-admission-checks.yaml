@@ -1,0 +1,246 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-provisioning-admission-runbook
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    platform.openai.com/component: provisioning-admission
+data:
+  admissionFlow: "quota reservation -> ProvisioningRequest -> Cluster Autoscaler capacity signal -> incident diagnostic admission"
+  incidentPriority: "Fresh incident creation and alert routing stay ahead of historical diagnostic backfills."
+  fallbackPolicy: "Retry twice, keep rollouts frozen, and requeue lower-priority diagnostics to incident-critical-queue."
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: cpu-incident-provisioned
+spec:
+  nodeLabels:
+    workload-class: incident-response
+    capacity.mlops.dev/provisioned: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: gpu-diagnostic-provisioned
+spec:
+  nodeLabels:
+    accelerator: nvidia-l4
+    workload-class: incident-diagnostic
+    capacity.mlops.dev/provisioned: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: incident-provisioned-queue
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: cpu-incident-provisioned
+          resources:
+            - name: cpu
+              nominalQuota: 48
+              borrowingLimit: 16
+            - name: memory
+              nominalQuota: 192Gi
+              borrowingLimit: 64Gi
+  admissionChecksStrategy:
+    admissionChecks:
+      - name: observability-provisioning-capacity
+        onFlavors: ["cpu-incident-provisioned"]
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Any
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: observability-gpu-provisioned-queue
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: gpu-diagnostic-provisioned
+          resources:
+            - name: cpu
+              nominalQuota: 24
+            - name: memory
+              nominalQuota: 96Gi
+            - name: nvidia.com/gpu
+              nominalQuota: 4
+  admissionChecksStrategy:
+    admissionChecks:
+      - name: observability-provisioning-capacity
+        onFlavors: ["gpu-diagnostic-provisioned"]
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: incident-provisioned-queue
+  namespace: mlops-observability
+spec:
+  clusterQueue: incident-provisioned-queue
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: observability-gpu-provisioned-queue
+  namespace: mlops-observability
+spec:
+  clusterQueue: observability-gpu-provisioned-queue
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: AdmissionCheck
+metadata:
+  name: observability-provisioning-capacity
+spec:
+  controllerName: kueue.x-k8s.io/provisioning-request
+  parameters:
+    apiGroup: kueue.x-k8s.io
+    kind: ProvisioningRequestConfig
+    name: observability-provisioning-config
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ProvisioningRequestConfig
+metadata:
+  name: observability-provisioning-config
+spec:
+  provisioningClassName: check-capacity.autoscaling.x-k8s.io
+  managedResources:
+    - cpu
+    - memory
+    - nvidia.com/gpu
+  retryStrategy:
+    backoffLimitCount: 2
+    backoffBaseSeconds: 60
+    backoffMaxSeconds: 1800
+  podSetMergePolicy: IdenticalWorkloadSchedulingRequirements
+  podSetUpdates:
+    nodeSelector:
+      - key: autoscaling.cloud-provider.com/provisioning-request
+        valueFromProvisioningClassDetail: RequestKey
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: observability-provisioned-incident-
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    app.kubernetes.io/component: provisioned-incident-diagnostics
+    kueue.x-k8s.io/queue-name: incident-provisioned-queue
+  annotations:
+    provreq.kueue.x-k8s.io/maxRunDurationSeconds: "2400"
+    provreq.kueue.x-k8s.io/ValidUntilSeconds: "600"
+spec:
+  parallelism: 6
+  completions: 12
+  completionMode: Indexed
+  backoffLimitPerIndex: 1
+  maxFailedIndexes: 2
+  template:
+    spec:
+      serviceAccountName: incident-responder
+      restartPolicy: Never
+      containers:
+        - name: incident-shard
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+          command: ["python", "-m", "model_observability_platform", "reliability-plan", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: observability-gpu-diagnostic-
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    app.kubernetes.io/component: provisioned-gpu-diagnostics
+    kueue.x-k8s.io/queue-name: observability-gpu-provisioned-queue
+  annotations:
+    provreq.kueue.x-k8s.io/maxRunDurationSeconds: "5400"
+    provreq.kueue.x-k8s.io/ValidUntilSeconds: "1200"
+spec:
+  parallelism: 2
+  completions: 4
+  completionMode: Indexed
+  template:
+    spec:
+      serviceAccountName: drift-evaluator
+      restartPolicy: Never
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: gpu-diagnostic
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+          command: ["python", "-m", "model_observability_platform", "trace-report", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "4"
+              memory: 8Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-provisioning-admission-alerts
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    prometheus: platform
+spec:
+  groups:
+    - name: observability.provisioning-admission
+      rules:
+        - alert: ObservabilityProvisioningAdmissionPendingTooLong
+          expr: max_over_time(kueue_admission_check_state{namespace="mlops-observability",admission_check="observability-provisioning-capacity",state="Pending"}[15m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Observability ProvisioningRequest is pending longer than the incident triage SLO.
+            runbook: "Prioritize fresh incident routing, inspect ProvisioningRequest status, and keep rollout freeze active."
+        - alert: ObservabilityProvisioningRequestRetriesExhausted
+          expr: increase(kueue_provisioning_request_retries_total{namespace="mlops-observability",admission_check="observability-provisioning-capacity"}[30m]) >= 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Observability ProvisioningRequest exhausted retry budget.
+            runbook: "Requeue lower-priority diagnostics, keep rollouts frozen, and publish partial incident evidence."
+        - alert: ObservabilityProvisioningBookingExpired
+          expr: kueue_provisioning_request_condition{namespace="mlops-observability",condition="BookingExpired",status="true"} > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Provisioned diagnostic capacity booking expired before incident workers consumed it.
+            runbook: "Run incident smoke checks before publishing updated dashboard evidence."

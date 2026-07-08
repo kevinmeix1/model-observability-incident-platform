@@ -29,6 +29,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("KubeRay Capacity", "kuberay_capacity_plan.json", "Incident fanout RayJobs, Kueue priority queues, optional GPU diagnostics, and rollout-freeze fallback."),
         ("Inference Gateway", "inference_gateway_plan.json", "Observed InferencePools, endpoint picker incident signals, objective priorities, and canary-freeze fallbacks."),
         ("Semantic Telemetry", "semantic_telemetry_plan.json", "OTel, Kubernetes, GenAI-style, SLO, and incident attributes with payload redaction rules."),
+        ("Deadline Alerts", "deadline_alert_plan.json", "Airflow 3 telemetry freshness, incident creation, root-cause, and dashboard publish deadline policies."),
         ("Performance Budget", "performance_budget.json", "Detection latency, incident creation, coverage, routing, and dashboard gates."),
         ("Queue Simulation", "queue_simulation.json", "Kueue quota, incident priority, GPU diagnostics, Airflow pool, and preemption simulation."),
         ("Release Admission", "release_admission_decision.json", "Fail-closed rollout freeze record combining incidents, SLOs, queues, governance, and provenance."),

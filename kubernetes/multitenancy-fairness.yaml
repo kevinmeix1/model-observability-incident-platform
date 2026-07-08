@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-observability-incident
+  labels:
+    platform.mlops.dev/tenant: incident-response
+    platform.mlops.dev/cost-center: ml-reliability
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: incident-response-quota
+  namespace: ml-observability-incident
+spec:
+  hard:
+    requests.cpu: "18"
+    requests.memory: 72Gi
+    pods: "50"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: incident-response-limits
+  namespace: ml-observability-incident
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 250m
+        memory: 512Mi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-response-edit
+  namespace: ml-observability-incident
+subjects:
+  - kind: Group
+    name: ml-reliability-oncall
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-default-deny
+  namespace: ml-observability-incident
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: ml-observability-cohort
+spec:
+  fairSharing:
+    weight: 1
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: incident-response-tenant-queue
+spec:
+  cohort: ml-observability-cohort
+  namespaceSelector:
+    matchLabels:
+      platform.mlops.dev/tenant: incident-response
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Any
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: cpu-spot
+          resources:
+            - name: cpu
+              nominalQuota: 18
+              borrowingLimit: 6
+            - name: memory
+              nominalQuota: 72Gi
+              borrowingLimit: 16Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-tenant-pools
+  namespace: ml-observability-incident
+data:
+  pools.json: |
+    {"incident-response": 7, "drift-monitoring": 4, "retention-maintenance": 2}

@@ -24,6 +24,7 @@ from model_observability_platform.reliability_control import build_reliability_p
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.slo import build_slo_report
 from model_observability_platform.supply_chain import build_supply_chain_evidence
+from model_observability_platform.tenancy import build_tenancy_report
 from model_observability_platform.telemetry import generate_window
 from model_observability_platform.traceability import build_trace_report
 
@@ -300,7 +301,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -316,6 +317,21 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("ResourceFlavor", manifest)
             self.assertIn("ResourceClaimTemplate", manifest)
             self.assertIn("nvidia.com/mig-1g.10gb", manifest)
+
+    def test_tenancy_fairness_report_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "multitenancy-fairness.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_tenancy_report(root)
+            tenant_names = {tenant["name"] for tenant in report["tenants"]}
+
+            self.assertTrue(report["passed"])
+            self.assertIn("incident-response", tenant_names)
+            self.assertIn("ml-observability-cohort", report["fairness"]["cohort"])
+            self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
+            for expected in ["ResourceQuota", "LimitRange", "RoleBinding", "NetworkPolicy", "Cohort", "ClusterQueue", "airflow-tenant-pools"]:
+                self.assertIn(expected, manifest)
 
     def test_orchestration_scorecard_covers_advanced_controls(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -367,6 +383,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "governance_evidence_bundle.json",
                 "slo_error_budget.json",
                 "accelerator_capacity_plan.json",
+                "tenancy_fairness_report.json",
                 "performance_budget.json",
                 "queue_simulation.json",
                 "release_admission_decision.json",
@@ -410,6 +427,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "model_observability_dashboard.html").exists())
             self.assertTrue((root / "reports" / "index.html").exists())
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
+            self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())
             self.assertTrue((root / "reports" / "queue_simulation.json").exists())
             self.assertTrue((root / "reports" / "release_admission_decision.json").exists())

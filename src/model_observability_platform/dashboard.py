@@ -36,6 +36,12 @@ def observed_summary(check: dict) -> object:
     return check.get("observed")
 
 
+def asset_chips(value: list[str]) -> str:
+    if not value:
+        return '<span class="chip muted">none</span>'
+    return "".join(f'<span class="chip">{esc(asset.replace("_", " "))}</span>' for asset in value)
+
+
 def rows(items: list[dict], columns: list[str]) -> str:
     if not items:
         return f"<tr><td colspan='{len(columns)}'>No records</td></tr>"
@@ -55,7 +61,7 @@ def rows(items: list[dict], columns: list[str]) -> str:
 def render_dashboard(output_path: str | Path, *, report: dict, incident_summary: dict, reliability_plan: dict | None = None) -> Path:
     reliability_plan = reliability_plan or {}
     reliability_action = str(reliability_plan.get("recommended_action", "not planned")).replace("_", " ")
-    impacted_assets = ", ".join(str(asset).replace("_", " ") for asset in reliability_plan.get("impacted_assets", [])) or "none"
+    impacted_assets = [str(asset) for asset in reliability_plan.get("impacted_assets", [])]
     check_rows = [
         {
             "check": LABELS.get(check["name"], check["name"]),
@@ -68,7 +74,7 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
     ]
     incident_rows = [
         {
-            "incident": incident["incident_id"],
+            "incident": incident["incident_id"][:16],
             "check": LABELS.get(incident["check"], incident["check"]),
             "severity": severity_badge(incident["severity"]),
             "root": incident["root_cause"].replace("_", " "),
@@ -116,6 +122,8 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
         .critical,.high {{ color:#991b1b; background:#fee2e2; }}
         .medium {{ color:#92400e; background:#fef3c7; }}
         .low {{ color:#166534; background:#dcfce7; }}
+        .chip {{ display:inline-block; margin:0 5px 5px 0; padding:4px 8px; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:12px; font-weight:800; white-space:nowrap; }}
+        .chip.muted {{ background:#f1f5f9; color:#475569; }}
         .summary {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }}
         .summary div {{ border:1px solid #e3e9f0; border-radius:6px; padding:12px; min-height:74px; }}
         .summary span {{ display:block; color:#64748b; font-size:12px; margin-bottom:8px; }}
@@ -153,7 +161,7 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
                 <div><span>Recommended action</span><strong>{esc(reliability_action)}</strong></div>
                 <div><span>Error burn rate</span><strong>{esc(reliability_plan.get('error_budget_burn_rate', 'n/a'))}</strong></div>
                 <div><span>Owner</span><strong>{esc(reliability_plan.get('routing', {}).get('owner', 'n/a'))}</strong></div>
-                <div><span>Impacted assets</span><strong>{esc(impacted_assets)}</strong></div>
+                <div><span>Impacted assets</span><strong>{asset_chips(impacted_assets)}</strong></div>
               </div>
             </div>
             <div class="panel">

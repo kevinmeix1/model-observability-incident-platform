@@ -18,6 +18,13 @@ except Exception:
 MODELS = ["credit-risk", "churn-risk", "demand-forecast"]
 CHECKS = ["feature_drift", "prediction_drift", "latency_slo", "error_rate", "freshness"]
 OBSERVABILITY_IMAGE = "ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0"
+EVENT_DRIVEN_ASSET_EXPRESSION = "(PREDICTION_LOGS | MANUAL_INCIDENT_REPLAY) & OBSERVABILITY_POLICY"
+ASSET_WATCHER_CONTRACTS = {
+    "AssetWatcher": "telemetry queue, incident replay, and policy events update Airflow reliability assets",
+    "BaseEventTrigger": "watchers must inherit from BaseEventTrigger to avoid rescheduling loops",
+    "shared_stream_key": "telemetry, incident-router, and policy watchers share upstream polling across subscribers",
+    "AssetAlias": "runtime incident evidence bundle URIs and dashboard links resolve after diagnostics",
+}
 
 
 def monitor_pod(task_id: str, command: str, *, priority_weight: int = 1):

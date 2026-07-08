@@ -132,6 +132,8 @@ For Kueue quota pressure, incident priority, diagnostic preemption, GPU use, and
 
 For fail-closed rollout-freeze decisions that combine incidents, SLOs, queue priority, governance, provenance, and diagnostic capacity, see [release admission control](docs/release-admission-control.md).
 
+For Airflow 3 AssetWatchers, `BaseEventTrigger` contracts, shared-stream polling, `AssetAlias`, and conditional incident asset expressions, see [event-driven assets](docs/event-driven-assets.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

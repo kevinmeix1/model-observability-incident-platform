@@ -26,6 +26,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Accelerator Plan", "accelerator_capacity_plan.json", "GPU, DRA, Kueue, MIG, and time-slicing plan for monitor workloads."),
         ("Device Allocation", "device_allocation_plan.json", "DRA ResourceClaim templates, Kueue coupling, diagnostic fallbacks, and incident-path guardrails."),
         ("DRA Resource Health", "resource_health_status_plan.json", "Kubernetes v1.36 ResourceHealthStatus, ResourceClaim device status, device quarantine, and incident annotation policy."),
+        ("Advanced Device Sharing", "advanced_device_sharing_plan.json", "DRA prioritized alternatives, partitionable devices, consumable capacity, and binding-condition readiness for diagnostics."),
         ("Topology Placement", "topology_placement_plan.json", "Kueue TAS, collector spread, optional GPU diagnostic locality, and incident fallbacks."),
         ("KubeRay Capacity", "kuberay_capacity_plan.json", "Incident fanout RayJobs, Kueue priority queues, optional GPU diagnostics, and rollout-freeze fallback."),
         ("Inference Gateway", "inference_gateway_plan.json", "Observed InferencePools, endpoint picker incident signals, objective priorities, and canary-freeze fallbacks."),

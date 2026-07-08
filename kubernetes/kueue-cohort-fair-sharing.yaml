@@ -1,0 +1,117 @@
+apiVersion: config.kueue.x-k8s.io/v1beta2
+kind: Configuration
+metadata:
+  name: observability-kueue-fair-sharing
+fairSharing:
+  preemptionStrategies:
+    - LessThanOrEqualToFinalShare
+    - LessThanInitialShare
+featureGates:
+  AdmissionFairSharing: true
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: ml-observability-cohort
+spec:
+  fairSharing:
+    weight: 1
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: incident-critical-tenant-queue
+spec:
+  cohort: ml-observability-cohort
+  fairSharing:
+    weight: 5
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Any
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: cpu-spot
+          resources:
+            - name: cpu
+              nominalQuota: 18
+              borrowingLimit: 6
+              lendingLimit: 1
+            - name: memory
+              nominalQuota: 72Gi
+              borrowingLimit: 18Gi
+              lendingLimit: 4Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: drift-monitoring-tenant-queue
+spec:
+  cohort: ml-observability-cohort
+  fairSharing:
+    weight: 2
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: LowerPriority
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: cpu-spot
+          resources:
+            - name: cpu
+              nominalQuota: 14
+              borrowingLimit: 8
+              lendingLimit: 4
+            - name: memory
+              nominalQuota: 56Gi
+              borrowingLimit: 24Gi
+              lendingLimit: 12Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: retention-maintenance-tenant-queue
+spec:
+  cohort: ml-observability-cohort
+  fairSharing:
+    weight: 1
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Never
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: cpu-spot
+          resources:
+            - name: cpu
+              nominalQuota: 8
+              borrowingLimit: 3
+              lendingLimit: 6
+            - name: memory
+              nominalQuota: 32Gi
+              borrowingLimit: 8Gi
+              lendingLimit: 20Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: incident-root-cause
+  namespace: ml-observability-incident
+spec:
+  clusterQueue: incident-critical-tenant-queue
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: embedding-drift
+  namespace: ml-observability-drift
+spec:
+  clusterQueue: drift-monitoring-tenant-queue
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: retention-compaction
+  namespace: ml-observability-retention
+spec:
+  clusterQueue: retention-maintenance-tenant-queue

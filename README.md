@@ -108,6 +108,8 @@ For Kubernetes Indexed Jobs, per-index retry budgets, `successPolicy`, `podFailu
 
 For Kueue ProvisioningRequest admission checks that protect incident diagnostics, rollback-freeze checks, and GPU drift probes, see [provisioning admission](docs/provisioning-admission.md).
 
+For Kueue MultiKueue cross-cluster incident dispatch, worker status sync, repair automation freeze semantics, and GPU diagnostic fallback, see [MultiKueue incident dispatch](docs/multikueue-dispatch.md).
+
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).
 
 For OTel, Kubernetes, GenAI-style, SLO, and incident telemetry attributes with collector-side payload redaction, see [semantic telemetry contract](docs/semantic-telemetry.md).

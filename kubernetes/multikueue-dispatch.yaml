@@ -1,0 +1,255 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-multikueue-runbook
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    platform.openai.com/component: multikueue-dispatch
+data:
+  incidentPriority: "Fresh incident diagnostics dispatch before repair backfills and historical drift recomputation."
+  repairPolicy: "Do not unfreeze repair automation until selected Workloads record status.clusterName."
+  runbook.md: |
+    MultiKueue manager cluster: observability-incident-manager.
+    Worker clusters: incident-diagnostics-east, incident-backfill-west, incident-gpu-investigation.
+    Watch status.nominatedClusterNames while the Workload is pending.
+    Record status.clusterName after a worker admits the Workload.
+    Remote Jobs are labeled kueue.x-k8s.io/prebuilt-workload-name by the manager.
+    If incident diagnostics cannot dispatch, keep rollout freeze and publish partial CPU evidence only.
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: multicluster-observability-incident-fleet
+spec:
+  nodeLabels:
+    nodepool.platform.openai.com/fleet: multikueue-observability-incident
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: AdmissionCheck
+metadata:
+  name: observability-multikueue
+spec:
+  controllerName: kueue.x-k8s.io/multikueue
+  parameters:
+    apiGroup: kueue.x-k8s.io
+    kind: MultiKueueConfig
+    name: observability-multikueue-config
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: MultiKueueConfig
+metadata:
+  name: observability-multikueue-config
+spec:
+  clusters:
+    - incident-diagnostics-east
+    - incident-backfill-west
+    - incident-gpu-investigation
+  quotaManagement: Manual
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: MultiKueueCluster
+metadata:
+  name: incident-diagnostics-east
+spec:
+  clusterSource:
+    kubeConfig:
+      locationType: Secret
+      location: incident-diagnostics-east-kubeconfig
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: MultiKueueCluster
+metadata:
+  name: incident-backfill-west
+spec:
+  clusterSource:
+    kubeConfig:
+      locationType: Secret
+      location: incident-backfill-west-kubeconfig
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: MultiKueueCluster
+metadata:
+  name: incident-gpu-investigation
+spec:
+  clusterSource:
+    kubeConfig:
+      locationType: Secret
+      location: incident-gpu-investigation-kubeconfig
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: observability-multikueue-incidents
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  admissionChecksStrategy:
+    admissionChecks:
+      - name: observability-multikueue
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: multicluster-observability-incident-fleet
+          resources:
+            - name: cpu
+              nominalQuota: "144"
+            - name: memory
+              nominalQuota: 704Gi
+            - name: nvidia.com/gpu
+              nominalQuota: "2"
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Any
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: observability-multikueue-incidents
+  namespace: mlops-observability
+spec:
+  clusterQueue: observability-multikueue-incidents
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: observability-fresh-incident-diagnostics-
+  namespace: mlops-observability
+  labels:
+    kueue.x-k8s.io/queue-name: observability-multikueue-incidents
+    kueue.x-k8s.io/priority-class: incident-critical
+    observability.platform.openai.com/workload: fresh-incident-diagnostics
+spec:
+  completionMode: Indexed
+  completions: 16
+  parallelism: 8
+  backoffLimitPerIndex: 1
+  maxFailedIndexes: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: observability-fresh-incident-diagnostics
+    spec:
+      serviceAccountName: incident-responder
+      restartPolicy: Never
+      containers:
+        - name: incident-diagnostic
+          image: ghcr.io/kevinmeix1/model-observability-diagnostic@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          command: ["python", "-m", "model_observability_platform", "reliability-plan", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "4"
+              memory: 8Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: observability-lineage-repair-backfill-
+  namespace: mlops-observability
+  labels:
+    kueue.x-k8s.io/queue-name: observability-multikueue-incidents
+    kueue.x-k8s.io/priority-class: diagnostic-backfill
+    observability.platform.openai.com/workload: lineage-repair-backfill
+spec:
+  completionMode: Indexed
+  completions: 24
+  parallelism: 6
+  backoffLimitPerIndex: 1
+  maxFailedIndexes: 4
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: observability-lineage-repair-backfill
+    spec:
+      serviceAccountName: incident-responder
+      restartPolicy: Never
+      containers:
+        - name: repair-backfill
+          image: ghcr.io/kevinmeix1/model-observability-diagnostic@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          command: ["python", "-m", "model_observability_platform", "trace-report", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "3"
+              memory: 6Gi
+            limits:
+              cpu: "3"
+              memory: 6Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: observability-gpu-drift-investigation-
+  namespace: mlops-observability
+  labels:
+    kueue.x-k8s.io/queue-name: observability-multikueue-incidents
+    kueue.x-k8s.io/priority-class: incident-critical
+    observability.platform.openai.com/workload: gpu-drift-investigation
+spec:
+  completionMode: Indexed
+  completions: 2
+  parallelism: 2
+  backoffLimitPerIndex: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: observability-gpu-drift-investigation
+    spec:
+      serviceAccountName: drift-evaluator
+      restartPolicy: Never
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: gpu-investigation
+          image: ghcr.io/kevinmeix1/model-observability-gpu-diagnostic@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          command: ["python", "-m", "model_observability_platform", "trace-report", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "8"
+              memory: 32Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: 32Gi
+              nvidia.com/gpu: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-multikueue-dispatch-alerts
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    prometheus: platform
+spec:
+  groups:
+    - name: observability.multikueue-dispatch
+      rules:
+        - alert: ObservabilityMultiKueueDispatchStalled
+          expr: histogram_quantile(0.95, sum by (le, cluster_queue) (rate(kueue_admission_checks_wait_time_seconds_bucket{cluster_queue="observability-multikueue-incidents"}[20m]))) > 900 and kueue_pending_workloads{cluster_queue="observability-multikueue-incidents",status="active"} > 0
+          for: 15m
+          labels:
+            severity: critical
+            team: ml-platform
+          annotations:
+            summary: Observability incident MultiKueue dispatch is stalled before a worker cluster is selected.
+            runbook_url: https://github.com/kevinmeix1/model-observability-incident-platform/blob/main/docs/multikueue-dispatch.md

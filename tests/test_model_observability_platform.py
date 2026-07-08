@@ -22,6 +22,7 @@ from model_observability_platform.indexed_job_resilience import build_indexed_jo
 from model_observability_platform.inference_gateway import build_inference_gateway_plan
 from model_observability_platform.io import read_csv, read_json, write_json
 from model_observability_platform.kuberay_capacity import build_kuberay_capacity_plan
+from model_observability_platform.multikueue_dispatch import build_multikueue_dispatch_plan
 from model_observability_platform.network_security import build_network_security_report
 from model_observability_platform.orchestration_scorecard import build_orchestration_scorecard
 from model_observability_platform.policy_audit import audit_platform_policy
@@ -316,7 +317,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "multikueue_dispatch_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -511,6 +512,27 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["Kueue Provisioning Admission", "ProvisioningRequest", "Cluster Autoscaler", "incident"]:
             self.assertIn(expected, docs)
 
+    def test_multikueue_dispatch_plan_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "multikueue-dispatch.yaml").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "multikueue-dispatch.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_multikueue_dispatch_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_multikueue_incident_dispatch")
+            self.assertTrue(report["incident_policy"]["fresh_incidents_before_backfills"])
+            self.assertEqual(report["incident_policy"]["missing_worker_assignment_action"], "freeze_repair_automation_and_keep_rollout_freeze")
+            self.assertEqual(report["manager_quota"]["nvidia_com_gpu"], 2)
+            self.assertIn("status.clusterName", report["dispatch_policy"]["status_fields"])
+            self.assertTrue(any(check["name"] == "repair_automation_waits_for_dispatch" for check in report["checks"]))
+            self.assertTrue((root / "reports" / "multikueue_dispatch_plan.json").exists())
+        for expected in ["MultiKueueConfig", "MultiKueueCluster", "kueue.x-k8s.io/multikueue", "admissionChecksStrategy", "fresh-incident-diagnostics", "kueue.x-k8s.io/prebuilt-workload-name", "ObservabilityMultiKueueDispatchStalled"]:
+            self.assertIn(expected, manifest)
+        for expected in ["MultiKueue Incident Dispatch", "fresh incident", "status.clusterName", "repair automation"]:
+            self.assertIn(expected, docs)
+
     def test_tenancy_fairness_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         manifest = (repo / "kubernetes" / "multitenancy-fairness.yaml").read_text(encoding="utf-8")
@@ -557,6 +579,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("kueue_elastic_workloads", names)
             self.assertIn("indexed_job_resilience", names)
             self.assertIn("provisioning_admission_checks", names)
+            self.assertIn("multikueue_dispatch", names)
             self.assertIn("supply_chain_provenance", names)
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
@@ -606,6 +629,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "elastic_workload_plan.json",
                 "indexed_job_resilience_plan.json",
                 "provisioning_admission_plan.json",
+                "multikueue_dispatch_plan.json",
                 "tenancy_fairness_report.json",
                 "identity_access_report.json",
                 "performance_budget.json",
@@ -660,6 +684,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "cost_observability_report.json").exists())
             self.assertTrue((root / "reports" / "elastic_workload_plan.json").exists())
             self.assertTrue((root / "reports" / "indexed_job_resilience_plan.json").exists())
+            self.assertTrue((root / "reports" / "multikueue_dispatch_plan.json").exists())
             self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "identity_access_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())

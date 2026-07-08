@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-observability-performance-budget
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability
+    app.kubernetes.io/component: performance-budget
+data:
+  diagnostic_runtime_seconds: "60"
+  incident_creation_seconds: "15"
+  failed_check_incident_coverage: "1.0"
+  alert_routing_seconds: "60"
+  dashboard_render_seconds: "30"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: model-observability-performance-budget
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability
+    app.kubernetes.io/component: performance-budget
+spec:
+  groups:
+    - name: model-observability.performance-budget
+      rules:
+        - alert: ObservabilityIncidentCreationBudgetExceeded
+          expr: |
+            histogram_quantile(0.95, sum(rate(incident_creation_duration_seconds_bucket[10m])) by (le)) > 15
+          for: 10m
+          labels:
+            severity: warning
+            owner: incident-response
+          annotations:
+            summary: Incident creation latency is over the reliability control-plane budget.
+            runbook_url: docs/performance-budgets.md
+        - alert: ObservabilityAlertRoutingBudgetExceeded
+          expr: |
+            histogram_quantile(0.95, sum(rate(alertmanager_notification_latency_seconds_bucket{team="ml-platform"}[10m])) by (le)) > 60
+          for: 10m
+          labels:
+            severity: warning
+            owner: oncall
+          annotations:
+            summary: Alert routing latency is above the pageability budget.
+            runbook_url: docs/performance-budgets.md

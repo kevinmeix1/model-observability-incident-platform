@@ -18,6 +18,7 @@ from .io import read_csv, write_json
 from .network_security import build_network_security_report
 from .orchestration_scorecard import build_orchestration_scorecard
 from .policy_audit import audit_platform_policy
+from .performance_budget import build_performance_budget_report
 from .reliability_control import build_reliability_plan
 from .resource_optimizer import build_resource_optimization_report
 from .slo import build_slo_report
@@ -49,6 +50,7 @@ def demo(output: str | Path) -> dict:
         project="Model Observability Incident Platform",
         primary_workload="telemetry diagnostics, drift checks, and incident review probes",
     )
+    performance_budget = build_performance_budget_report(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -84,6 +86,7 @@ def demo(output: str | Path) -> dict:
         "slo_error_budget": slo_error_budget,
         "cloud_migration": cloud_migration,
         "accelerator_capacity": accelerator_capacity,
+        "performance_budget": performance_budget,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
         "orchestration_scorecard": orchestration_scorecard,
@@ -129,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         "supply-chain",
         "orchestration-scorecard",
         "accelerator-plan",
+        "performance-budget",
     ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
@@ -163,4 +167,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_orchestration_scorecard(args.output, project="Model Observability Incident Platform"), indent=2, sort_keys=True))
     elif args.command == "accelerator-plan":
         print(json.dumps(build_accelerator_capacity_plan(args.output, project="Model Observability Incident Platform", primary_workload="telemetry diagnostics, drift checks, and incident review probes"), indent=2, sort_keys=True))
+    elif args.command == "performance-budget":
+        print(json.dumps(build_performance_budget_report(args.output), indent=2, sort_keys=True))
     return 0

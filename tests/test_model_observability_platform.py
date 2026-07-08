@@ -30,6 +30,7 @@ from model_observability_platform.kuberay_capacity import build_kuberay_capacity
 from model_observability_platform.multikueue_dispatch import build_multikueue_dispatch_plan
 from model_observability_platform.network_security import build_network_security_report
 from model_observability_platform.orchestration_scorecard import build_orchestration_scorecard
+from model_observability_platform.pending_workload_visibility import build_pending_workload_visibility_plan
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.performance_budget import build_performance_budget_report
 from model_observability_platform.pod_resource_envelopes import build_pod_resource_envelope_plan
@@ -325,7 +326,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -673,6 +674,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["Kueue Flavor Fungibility", "ResourceFlavor", "TryNextFlavor", "BorrowingOverPreemption"]:
             self.assertIn(expected, docs)
 
+    def test_pending_workload_visibility_plan_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        docs = (repo / "docs" / "kueue-pending-workload-visibility.md").read_text(encoding="utf-8")
+        manifest = (repo / "kubernetes" / "kueue-pending-workload-visibility.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_pending_workload_visibility_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_observability_kueue_pending_workload_visibility")
+            self.assertEqual(report["feature"]["api_group"], "visibility.kueue.x-k8s.io/v1beta2")
+            self.assertTrue(any(item["local_queue"] == "incident-root-cause" for item in report["pending_workloads"]))
+            self.assertTrue((root / "reports" / "pending_workload_visibility_plan.json").exists())
+        for expected in ["visibility.kueue.x-k8s.io", "clusterqueues/pendingworkloads", "localqueues/pendingworkloads", "kueue_admission_wait_time_seconds", "kueue_cluster_queue_resource_pending"]:
+            self.assertIn(expected, manifest)
+        for expected in ["Kueue Pending Workload Visibility", "VisibilityOnDemand", "incident diagnostics", "pending workload"]:
+            self.assertIn(expected, docs)
+
     def test_identity_access_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         manifest = (repo / "kubernetes" / "workload-identity.yaml").read_text(encoding="utf-8")
@@ -711,6 +730,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("pod_resource_envelopes", names)
             self.assertIn("kueue_cohort_fair_sharing", names)
             self.assertIn("kueue_flavor_fungibility", names)
+            self.assertIn("kueue_pending_workload_visibility", names)
             self.assertIn("supply_chain_provenance", names)
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
@@ -767,6 +787,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "pod_resource_envelope_plan.json",
                 "cohort_fair_sharing_plan.json",
                 "flavor_fungibility_plan.json",
+                "pending_workload_visibility_plan.json",
                 "tenancy_fairness_report.json",
                 "identity_access_report.json",
                 "performance_budget.json",
@@ -828,6 +849,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "pod_resource_envelope_plan.json").exists())
             self.assertTrue((root / "reports" / "cohort_fair_sharing_plan.json").exists())
             self.assertTrue((root / "reports" / "flavor_fungibility_plan.json").exists())
+            self.assertTrue((root / "reports" / "pending_workload_visibility_plan.json").exists())
             self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "identity_access_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())

@@ -1,0 +1,62 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kueue-observability-pending-workload-visibility
+rules:
+  - apiGroups:
+      - visibility.kueue.x-k8s.io
+    resources:
+      - clusterqueues/pendingworkloads
+      - localqueues/pendingworkloads
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kueue-observability-pending-workload-visibility
+subjects:
+  - kind: ServiceAccount
+    name: incident-router
+    namespace: ml-observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kueue-observability-pending-workload-visibility
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kueue-observability-pending-workload-queries
+  namespace: ml-observability
+data:
+  clusterqueue-incident.jsonpath: "/apis/visibility.kueue.x-k8s.io/v1beta2/clusterqueues/incident-diagnostics-flavor-queue/pendingworkloads"
+  localqueue-incident.jsonpath: "/apis/visibility.kueue.x-k8s.io/v1beta2/namespaces/ml-observability/localqueues/incident-root-cause/pendingworkloads"
+  localqueue-drift.jsonpath: "/apis/visibility.kueue.x-k8s.io/v1beta2/namespaces/ml-observability-drift/localqueues/embedding-drift/pendingworkloads"
+  apf-install: "kubectl apply --server-side -f https://github.com/kubernetes-sigs/kueue/releases/download/v0.18.2/visibility-apf.yaml"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kueue-observability-pending-workload-visibility
+  namespace: ml-observability
+spec:
+  groups:
+    - name: kueue-observability-pending-workload-visibility
+      rules:
+        - alert: KueueIncidentAdmissionWaitHigh
+          expr: histogram_quantile(0.95, sum(rate(kueue_admission_wait_time_seconds_bucket{cluster_queue="incident-diagnostics-flavor-queue"}[10m])) by (le)) > 300
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Incident root-cause diagnostics are waiting too long for Kueue admission"
+        - alert: KueueObservabilityPendingCpuHigh
+          expr: sum(kueue_cluster_queue_resource_pending{cluster_queue=~"incident-diagnostics-flavor-queue|retention-maintenance-flavor-queue",resource="cpu"}) > 18
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pending observability CPU is high across incident and maintenance ClusterQueues"

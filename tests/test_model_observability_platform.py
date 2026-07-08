@@ -7,6 +7,7 @@ from pathlib import Path
 from model_observability_platform.accelerator_plan import build_accelerator_capacity_plan
 from model_observability_platform.admin_access_diagnostics import build_admin_access_diagnostic_plan
 from model_observability_platform.advanced_device_sharing import build_advanced_device_sharing_plan
+from model_observability_platform.asset_partitioning import build_asset_partitioning_plan
 from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cloud_migration import build_cloud_migration_plan
@@ -330,7 +331,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -664,6 +665,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn(expected, docs)
         self.assertIn("rerun_with_latest_version=False", dag)
 
+    def test_asset_partitioning_plan_and_airflow_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        docs = (repo / "docs" / "airflow-asset-partitioning.md").read_text(encoding="utf-8")
+        dag = (repo / "airflow" / "dags" / "model_reliability_control_plane_dag.py").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_asset_partitioning_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_airflow_asset_partitioning_for_incident_windows")
+            self.assertIn("PartitionedAssetTimetable", report["features"]["timetables"])
+            self.assertTrue(any(flow["partition_key"] == "incident_fingerprint:window" for flow in report["flows"]))
+            self.assertTrue((root / "reports" / "asset_partitioning_plan.json").exists())
+        for expected in ["Airflow Asset Partitioning", "PartitionedAssetTimetable", "dag_run.partition_key", "scheduler-managed partition backfills"]:
+            self.assertIn(expected, docs)
+        for expected in ["CronPartitionTimetable", "PartitionedAssetTimetable", "StartOfHourMapper", "dag_run.partition_key", "partitioned_rollout_freeze_gate"]:
+            self.assertIn(expected, dag)
+
     def test_event_driven_assets_plan_and_docs_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         docs = (repo / "docs" / "event-driven-assets.md").read_text(encoding="utf-8")
@@ -803,6 +822,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("multikueue_dispatch", names)
             self.assertIn("incident_image_volume_evidence", names)
             self.assertIn("airflow_dag_bundle_versioning", names)
+            self.assertIn("airflow_asset_partitioning", names)
             self.assertIn("airflow_event_driven_assets", names)
             self.assertIn("pod_resource_envelopes", names)
             self.assertIn("kueue_cohort_fair_sharing", names)
@@ -868,6 +888,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "multikueue_dispatch_plan.json",
                 "incident_evidence_volume_plan.json",
                 "dag_bundle_versioning_plan.json",
+                "asset_partitioning_plan.json",
                 "event_driven_assets_plan.json",
                 "pod_resource_envelope_plan.json",
                 "cohort_fair_sharing_plan.json",
@@ -934,6 +955,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "multikueue_dispatch_plan.json").exists())
             self.assertTrue((root / "reports" / "incident_evidence_volume_plan.json").exists())
             self.assertTrue((root / "reports" / "dag_bundle_versioning_plan.json").exists())
+            self.assertTrue((root / "reports" / "asset_partitioning_plan.json").exists())
             self.assertTrue((root / "reports" / "event_driven_assets_plan.json").exists())
             self.assertTrue((root / "reports" / "pod_resource_envelope_plan.json").exists())
             self.assertTrue((root / "reports" / "cohort_fair_sharing_plan.json").exists())

@@ -9,7 +9,7 @@ try:
     from airflow.operators.empty import EmptyOperator
     from airflow.operators.python import BranchPythonOperator
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-    from airflow.sdk import Asset
+    from airflow.sdk import Asset, CronPartitionTimetable, DAG, PartitionedAssetTimetable, StartOfHourMapper
     from airflow.utils.trigger_rule import TriggerRule
 except Exception:
     AIRFLOW_AVAILABLE = False
@@ -57,7 +57,12 @@ def monitor_pod(task_id: str, command: str, *, priority_weight: int = 1):
 
 if AIRFLOW_AVAILABLE:
     PREDICTION_LOGS = Asset("warehouse://ml/prediction_logs")
+    OBSERVABILITY_POLICY = Asset("policy://ml/observability-policy")
+    CHECK_RESULTS = Asset("warehouse://ml/observability/check-results")
+    EVIDENCE_BUNDLES = Asset("oci://ghcr.io/kevinmeix1/observability-golden-incidents@sha256")
     INCIDENTS = Asset("incident://ml/model-reliability")
+    ROOT_CAUSE = Asset("incident://ml/root-cause")
+    ROLLOUT_FREEZE = Asset("release://ml/rollout-freeze-decision")
     DASHBOARD = Asset("dashboard://ml/model-observability")
 
     @dag(
@@ -158,3 +163,67 @@ if AIRFLOW_AVAILABLE:
         branch >> observe_only >> publish_dashboard
 
     model_reliability_control_plane()
+
+    with DAG(
+        dag_id="partitioned_observability_window_checks",
+        schedule=CronPartitionTimetable("*/15 * * * *", timezone="UTC"),
+        catchup=False,
+        max_active_runs=4,
+        tags=["airflow-3.2", "asset-partitioning", "observability", "telemetry"],
+    ):
+        @task(outlets=[CHECK_RESULTS])
+        def evaluate_telemetry_partition(dag_run=None) -> dict[str, str | None]:
+            partition_key = dag_run.partition_key if dag_run else None
+            return {
+                "partition_key": partition_key,
+                "prediction_logs": PREDICTION_LOGS.uri,
+                "policy_asset": OBSERVABILITY_POLICY.uri,
+                "check_results": CHECK_RESULTS.uri,
+            }
+
+        evaluate_telemetry_partition()
+
+    with DAG(
+        dag_id="partitioned_incident_root_cause",
+        schedule=PartitionedAssetTimetable(
+            assets=CHECK_RESULTS & INCIDENTS & OBSERVABILITY_POLICY & EVIDENCE_BUNDLES,
+            default_partition_mapper=StartOfHourMapper(),
+        ),
+        catchup=False,
+        max_active_runs=1,
+        tags=["airflow-3.2", "partitioned-backfill", "incident", "root-cause"],
+    ):
+        @task(outlets=[ROOT_CAUSE])
+        def build_root_cause_partition(dag_run=None) -> dict[str, str | None]:
+            partition_key = dag_run.partition_key if dag_run else None
+            return {
+                "partition_key": partition_key,
+                "incident_asset": INCIDENTS.uri,
+                "evidence_asset": EVIDENCE_BUNDLES.uri,
+                "root_cause_asset": ROOT_CAUSE.uri,
+            }
+
+        build_root_cause_partition()
+
+    with DAG(
+        dag_id="partitioned_rollout_freeze_gate",
+        schedule=PartitionedAssetTimetable(
+            assets=INCIDENTS & ROOT_CAUSE,
+            default_partition_mapper=StartOfHourMapper(),
+        ),
+        catchup=False,
+        max_active_runs=1,
+        tags=["airflow-3.2", "partitioned-backfill", "rollout-freeze"],
+    ):
+        @task(outlets=[ROLLOUT_FREEZE, DASHBOARD])
+        def decide_rollout_freeze_partition(dag_run=None) -> dict[str, str | None]:
+            partition_key = dag_run.partition_key if dag_run else None
+            return {
+                "partition_key": partition_key,
+                "root_cause_asset": ROOT_CAUSE.uri,
+                "freeze_asset": ROLLOUT_FREEZE.uri,
+                "dashboard_asset": DASHBOARD.uri,
+                "evidence": "aligned incident fingerprint, root-cause evidence, and route-generation partition",
+            }
+
+        decide_rollout_freeze_partition()

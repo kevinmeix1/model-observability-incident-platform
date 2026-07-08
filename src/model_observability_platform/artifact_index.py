@@ -41,6 +41,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("MultiKueue Dispatch", "multikueue_dispatch_plan.json", "Kueue MultiKueue incident dispatch, worker status sync, repair freeze, and GPU diagnostic fallback."),
         ("Incident Evidence Volumes", "incident_evidence_volume_plan.json", "Kubernetes image-volume incident evidence, digest-pinned bundles, read-only mounts, warmups, and object-store fallback."),
         ("DAG Bundle Versioning", "dag_bundle_versioning_plan.json", "Airflow 3 GitDagBundle versioning for incident replay, root-cause fanout, and rollout-freeze recovery."),
+        ("Asset Partitioning", "asset_partitioning_plan.json", "Airflow 3.2 partitioned assets for telemetry windows, incident root-cause fanout, rollout-freeze gates, and evidence lineage."),
         ("Event-Driven Assets", "event_driven_assets_plan.json", "Airflow 3 AssetWatchers for prediction logs, incident replay, policy assets, and diagnostic fanout."),
         ("Pod Resource Envelopes", "pod_resource_envelope_plan.json", "Kubernetes pod-level resources, scheduling gates, incident evidence readiness, policy digests, and scheduler-churn observability."),
         ("Cohort Fair Sharing", "cohort_fair_sharing_plan.json", "Kueue Fair Sharing, Admission Fair Sharing, incident queue weights, borrowing/lending limits, and preemption guardrails."),

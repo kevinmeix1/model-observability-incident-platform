@@ -128,6 +128,8 @@ For Kueue ResourceFlavor fallback, `TryNextFlavor` behavior, and observability s
 
 For Airflow 3 GitDagBundle configuration, DAG versioning, scheduler-managed backfills, and incident replay semantics, see [Airflow DAG Bundles](docs/airflow-dag-bundles.md).
 
+For Airflow 3.2 asset partitioning across telemetry windows, incident root-cause fanout, evidence bundles, and rollout-freeze backfills, see [Airflow asset partitioning](docs/airflow-asset-partitioning.md).
+
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).
 
 For OTel, Kubernetes, GenAI-style, SLO, and incident telemetry attributes with collector-side payload redaction, see [semantic telemetry contract](docs/semantic-telemetry.md).

@@ -25,6 +25,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Cloud Migration Plan", "cloud_migration_plan.json", "Managed cloud observability migration notes for Kubernetes and data platforms."),
         ("Accelerator Plan", "accelerator_capacity_plan.json", "GPU, DRA, Kueue, MIG, and time-slicing plan for monitor workloads."),
         ("Device Allocation", "device_allocation_plan.json", "DRA ResourceClaim templates, Kueue coupling, diagnostic fallbacks, and incident-path guardrails."),
+        ("DRA Resource Health", "resource_health_status_plan.json", "Kubernetes v1.36 ResourceHealthStatus, ResourceClaim device status, device quarantine, and incident annotation policy."),
         ("Topology Placement", "topology_placement_plan.json", "Kueue TAS, collector spread, optional GPU diagnostic locality, and incident fallbacks."),
         ("KubeRay Capacity", "kuberay_capacity_plan.json", "Incident fanout RayJobs, Kueue priority queues, optional GPU diagnostics, and rollout-freeze fallback."),
         ("Inference Gateway", "inference_gateway_plan.json", "Observed InferencePools, endpoint picker incident signals, objective priorities, and canary-freeze fallbacks."),

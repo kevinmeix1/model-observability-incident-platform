@@ -38,6 +38,7 @@ from model_observability_platform.provisioning_admission import build_provisioni
 from model_observability_platform.queue_simulator import build_queue_simulation
 from model_observability_platform.release_admission import build_release_admission_decision, evaluate_release_admission
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
+from model_observability_platform.resource_health_status import build_resource_health_status_plan
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.semantic_telemetry import build_semantic_telemetry_plan
 from model_observability_platform.slo import build_slo_report
@@ -326,7 +327,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -360,6 +361,25 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 self.assertIn(expected, manifest)
             for expected in ["Dynamic Resource Allocation", "time-slicing", "MIG", "CPU fallback", "ResourceClaim"]:
                 self.assertIn(expected, docs)
+
+    def test_dra_resource_health_status_plan_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "dra-resource-health-status.yaml").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "dra-resource-health-status.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_resource_health_status_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_observability_dra_resource_health_runbook")
+            self.assertEqual(report["feature"]["state"], "Kubernetes v1.36 beta and enabled by default")
+            self.assertEqual(report["unhealthy_or_unknown_count"], 2)
+            self.assertTrue(any(event["workload"] == "incident-root-cause-probe" for event in report["device_health_events"]))
+            self.assertTrue((root / "reports" / "resource_health_status_plan.json").exists())
+        for expected in ["DeviceTaintRule", "allocatedResourcesStatus", "ResourceHealthStatus", "resourceclaims", "kube_resourceclaim_status_devices"]:
+            self.assertIn(expected, manifest)
+        for expected in ["incident creation", "ResourceClaim", "PodResourcesLister", "CPU PSI-only"]:
+            self.assertIn(expected, docs)
 
     def test_topology_placement_plan_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -731,6 +751,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("kueue_cohort_fair_sharing", names)
             self.assertIn("kueue_flavor_fungibility", names)
             self.assertIn("kueue_pending_workload_visibility", names)
+            self.assertIn("dra_resource_health_status", names)
             self.assertIn("supply_chain_provenance", names)
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
@@ -771,6 +792,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "slo_error_budget.json",
                 "accelerator_capacity_plan.json",
                 "device_allocation_plan.json",
+                "resource_health_status_plan.json",
                 "topology_placement_plan.json",
                 "kuberay_capacity_plan.json",
                 "inference_gateway_plan.json",
@@ -834,6 +856,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "index.html").exists())
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "device_allocation_plan.json").exists())
+            self.assertTrue((root / "reports" / "resource_health_status_plan.json").exists())
             self.assertTrue((root / "reports" / "topology_placement_plan.json").exists())
             self.assertTrue((root / "reports" / "kuberay_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "inference_gateway_plan.json").exists())

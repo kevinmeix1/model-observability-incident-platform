@@ -112,6 +112,8 @@ For Kueue MultiKueue cross-cluster incident dispatch, worker status sync, repair
 
 For Kubernetes image-volume incident evidence mounts, digest-pinned reference windows, policy bundles, golden incidents, runbooks, and object-store fallback semantics, see [incident evidence volumes](docs/incident-evidence-volumes.md).
 
+For Kubernetes pod-level resource envelopes, stable scheduling gates, incident evidence readiness, policy digest checks, and scheduler-churn metrics, see [pod resource envelopes](docs/pod-resource-envelopes.md).
+
 For Airflow 3 GitDagBundle configuration, DAG versioning, scheduler-managed backfills, and incident replay semantics, see [Airflow DAG Bundles](docs/airflow-dag-bundles.md).
 
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).

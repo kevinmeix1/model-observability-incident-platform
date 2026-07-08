@@ -19,6 +19,7 @@ from model_observability_platform.orchestration_scorecard import build_orchestra
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.performance_budget import build_performance_budget_report
 from model_observability_platform.queue_simulator import build_queue_simulation
+from model_observability_platform.release_admission import build_release_admission_decision, evaluate_release_admission
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.slo import build_slo_report
@@ -90,6 +91,38 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "queue_simulation.json").exists())
             self.assertIn("PriorityClass", manifest)
             self.assertIn("ObservabilityQueuePressureHigh", manifest)
+
+    def test_release_admission_freezes_rollouts_during_incidents(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "release-admission-policy.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "reports" / "slo_error_budget.json", {"max_burn_rate": 0.2, "release_freeze": False, "recommended_action": "healthy"})
+            write_json(root / "reports" / "performance_budget.json", {"passed": True, "checks": []})
+            write_json(root / "reports" / "queue_simulation.json", {"passed": True, "pending_count": 0, "simulation": {"pending": []}})
+            write_json(root / "reports" / "governance_evidence_bundle.json", {"release": {"decision": "healthy"}})
+            write_json(root / "reports" / "supply_chain_evidence.json", {"artifact_count": 8, "subject": {"attestation_action": "actions/attest@v4"}})
+            write_json(root / "reports" / "reliability_control_plan.json", {"recommended_action": "healthy"})
+            write_json(root / "reports" / "incident_summary.json", {"open_count": 0, "severity": "low"})
+
+            decision = build_release_admission_decision(root)
+            frozen = evaluate_release_admission(
+                slo={"max_burn_rate": 100.0, "release_freeze": True, "recommended_action": "freeze_rollouts_and_page"},
+                performance={"passed": True, "checks": []},
+                queue={"passed": True, "pending_count": 0, "simulation": {"pending": []}},
+                governance={"release": {"decision": "incident_review_required"}},
+                supply_chain={"artifact_count": 8, "subject": {"attestation_action": "actions/attest@v4"}},
+                reliability_plan={"recommended_action": "page_and_freeze_rollouts"},
+                incidents={"open_count": 5, "severity": "high"},
+            )
+
+            self.assertEqual(decision["decision"]["recommended_action"], "admit_observability_change")
+            self.assertFalse(decision["decision"]["unsafe_allow"])
+            self.assertEqual(frozen["recommended_action"], "freeze_rollouts_and_page")
+            self.assertTrue((root / "reports" / "release_admission_decision.json").exists())
+            self.assertIn("ValidatingAdmissionPolicy", manifest)
+            self.assertIn("AnalysisTemplate", manifest)
+            self.assertIn("ObservabilityAdmissionUnsafeAllow", manifest)
 
     def test_performance_budget_report_and_prometheus_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -267,7 +300,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "queue_simulation.json", "performance_budget.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -336,6 +369,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "accelerator_capacity_plan.json",
                 "performance_budget.json",
                 "queue_simulation.json",
+                "release_admission_decision.json",
                 "resource_optimization.json",
                 "network_security.json",
                 "chaos_drill_report.json",
@@ -378,6 +412,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())
             self.assertTrue((root / "reports" / "queue_simulation.json").exists())
+            self.assertTrue((root / "reports" / "release_admission_decision.json").exists())
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
             self.assertTrue((root / "reports" / "supply_chain_evidence.json").exists())
 

@@ -1,0 +1,94 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: observability-control-plane-release-evidence
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs"]
+  validations:
+    - expression: "has(object.metadata.annotations) && has(object.metadata.annotations['mlops.dev/release-decision'])"
+      message: "Observability control-plane changes require the generated release admission decision."
+    - expression: "object.metadata.annotations['mlops.dev/release-decision'] in ['admit_observability_change', 'hold_observability_change', 'freeze_rollouts_and_page', 'reserve_incident_diagnostics']"
+      message: "release-decision must match an observability controller action."
+    - expression: "has(object.metadata.annotations['mlops.dev/evidence-sha']) && size(object.metadata.annotations['mlops.dev/evidence-sha']) == 64"
+      message: "observability admission requires a sha256 evidence bundle reference."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: observability-control-plane-release-evidence
+spec:
+  policyName: observability-control-plane-release-evidence
+  validationActions: ["Deny"]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: observability-control-plane-analysis
+  namespace: ml-observability
+spec:
+  metrics:
+    - name: incident-creation-coverage
+      interval: 2m
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] >= 1
+      provider:
+        prometheus:
+          address: http://prometheus-operated.monitoring.svc:9090
+          query: min(mlops_incident_coverage_ratio{platform="model-observability"})
+    - name: telemetry-freshness-burn
+      interval: 2m
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] < 6
+      provider:
+        prometheus:
+          address: http://prometheus-operated.monitoring.svc:9090
+          query: max(mlops_slo_burn_rate{slo="telemetry_freshness"})
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-release-admission
+  namespace: ml-observability
+spec:
+  groups:
+    - name: observability.release.admission
+      rules:
+        - alert: ObservabilityAdmissionUnsafeAllow
+          expr: mlops_release_admission_unsafe_allow{platform="model-observability"} > 0
+          for: 1m
+          labels:
+            severity: critical
+            team: ml-reliability
+          annotations:
+            summary: Observability admission attempted to allow a change while fail-closed gates failed.
+        - alert: ObservabilityRolloutFreezeActive
+          expr: mlops_release_admission_freeze{platform="model-observability"} > 0
+          for: 5m
+          labels:
+            severity: warning
+            team: ml-reliability
+          annotations:
+            summary: Model rollouts are frozen by active incidents, SLO burn, queue pressure, governance, or provenance policy.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-release-admission-assets
+  namespace: ml-observability
+data:
+  airflow_assets.txt: |
+    asset://ml-observability/incidents/summary
+    asset://ml-observability/reliability/control-plan
+    asset://ml-observability/release-admission-decision

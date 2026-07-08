@@ -100,6 +100,8 @@ For detection latency, incident creation, coverage, alert routing, and dashboard
 
 For Kueue quota pressure, incident priority, diagnostic preemption, GPU use, and Airflow pool examples, see [queue capacity simulation](docs/queue-capacity-simulation.md).
 
+For fail-closed rollout-freeze decisions that combine incidents, SLOs, queue priority, governance, provenance, and diagnostic capacity, see [release admission control](docs/release-admission-control.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

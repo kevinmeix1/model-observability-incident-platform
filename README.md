@@ -104,6 +104,8 @@ For DRA prioritized alternatives, partitionable devices, consumable capacity, an
 
 For Kubernetes v1.36 DRA `AdminAccess` diagnostics with incident linkage, evidence-quality metadata, and rollout-freeze guardrails, see [Observability DRA AdminAccess diagnostics](docs/dra-admin-access-diagnostics.md).
 
+For Kubernetes v1.35 in-place Pod Resize, v1.36 pod-level resource resizing, incident-safe monitor bursts, and VPA `InPlaceOrRecreate` guardrails, see [observability in-place Pod resize controls](docs/inplace-pod-resize.md).
+
 For Kueue topology-aware diagnostics, telemetry collector spread, and incident-safe placement fallbacks, see [topology-aware scheduling](docs/topology-aware-scheduling.md).
 
 For KubeRay incident fanout, Kueue priority queues, optional GPU drift diagnostics, and rollout-freeze fallbacks, see [KubeRay and Kueue](docs/kuberay-kueue.md).

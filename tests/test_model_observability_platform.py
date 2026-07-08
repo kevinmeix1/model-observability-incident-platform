@@ -16,6 +16,7 @@ from model_observability_platform.governance import build_governance_bundle
 from model_observability_platform.identity import build_identity_access_report
 from model_observability_platform.incidents import create_incidents
 from model_observability_platform.io import read_csv, read_json, write_json
+from model_observability_platform.kuberay_capacity import build_kuberay_capacity_plan
 from model_observability_platform.network_security import build_network_security_report
 from model_observability_platform.orchestration_scorecard import build_orchestration_scorecard
 from model_observability_platform.policy_audit import audit_platform_policy
@@ -304,7 +305,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -355,6 +356,26 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn(expected, manifest)
         for expected in ["Topology-Aware Scheduling", "topology spread constraints", "AdmissionChecks", "incident"]:
             self.assertIn(expected, docs)
+
+    def test_kuberay_capacity_plan_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "kuberay-kueue-workloads.yaml").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "kuberay-kueue.md").read_text(encoding="utf-8")
+        dag = (repo / "airflow" / "dags" / "model_reliability_control_plane_dag.py").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_kuberay_capacity_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_kuberay_incident_fanout")
+            self.assertTrue((root / "reports" / "kuberay_capacity_plan.json").exists())
+            self.assertEqual(report["capacity"]["max_gpu_demand"], 6)
+        for expected in ["RayJob", "enableInTreeAutoscaling", "kueue.x-k8s.io/elastic-job", "incident-root-cause-fanout", "ObservabilityRayIncidentFanoutDelayed"]:
+            self.assertIn(expected, manifest)
+        for expected in ["KubeRay", "Kueue", "incident", "GPU"]:
+            self.assertIn(expected, docs)
+        for expected in ["submit_kuberay_incident_fanout", "wait_for_kuberay_incident_fanout_deferrable", "rayjob/incident-root-cause-fanout"]:
+            self.assertIn(expected, dag)
 
     def test_tenancy_fairness_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -437,6 +458,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "accelerator_capacity_plan.json",
                 "device_allocation_plan.json",
                 "topology_placement_plan.json",
+                "kuberay_capacity_plan.json",
                 "tenancy_fairness_report.json",
                 "identity_access_report.json",
                 "performance_budget.json",
@@ -484,6 +506,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "device_allocation_plan.json").exists())
             self.assertTrue((root / "reports" / "topology_placement_plan.json").exists())
+            self.assertTrue((root / "reports" / "kuberay_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "identity_access_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())

@@ -1,4 +1,4 @@
-.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan topology-plan tenancy-report identity-report performance-budget queue-simulation release-admission ci-verify kubernetes-plan minikube-up test clean
+.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan topology-plan kuberay-plan tenancy-report identity-report performance-budget queue-simulation release-admission ci-verify kubernetes-plan minikube-up test clean
 
 demo:
 	PYTHONPATH=src python3 -m model_observability_platform demo --output .local
@@ -51,6 +51,9 @@ device-plan:
 topology-plan:
 	PYTHONPATH=src python3 -m model_observability_platform topology-plan --output .local
 
+kuberay-plan:
+	PYTHONPATH=src python3 -m model_observability_platform kuberay-plan --output .local
+
 tenancy-report:
 	PYTHONPATH=src python3 -m model_observability_platform tenancy-report --output .local
 
@@ -78,6 +81,7 @@ ci-verify:
 	test -f .local/reports/accelerator_capacity_plan.json
 	test -f .local/reports/device_allocation_plan.json
 	test -f .local/reports/topology_placement_plan.json
+	test -f .local/reports/kuberay_capacity_plan.json
 	test -f .local/reports/tenancy_fairness_report.json
 	test -f .local/reports/identity_access_report.json
 	test -f .local/reports/performance_budget.json
@@ -92,6 +96,7 @@ ci-verify:
 	python3 -m json.tool .local/reports/accelerator_capacity_plan.json >/dev/null
 	python3 -m json.tool .local/reports/device_allocation_plan.json >/dev/null
 	python3 -m json.tool .local/reports/topology_placement_plan.json >/dev/null
+	python3 -m json.tool .local/reports/kuberay_capacity_plan.json >/dev/null
 	python3 -m json.tool .local/reports/tenancy_fairness_report.json >/dev/null
 	python3 -m json.tool .local/reports/identity_access_report.json >/dev/null
 	python3 -m json.tool .local/reports/performance_budget.json >/dev/null
@@ -116,6 +121,7 @@ minikube-up:
 	@echo "  kubectl apply -f kubernetes/accelerator-scheduling.yaml"
 	@echo "  kubectl apply -f kubernetes/dynamic-resource-allocation.yaml"
 	@echo "  kubectl apply -f kubernetes/topology-aware-scheduling.yaml"
+	@echo "  kubectl apply -f kubernetes/kuberay-kueue-workloads.yaml"
 	@echo "  kubectl apply -f kubernetes/multitenancy-fairness.yaml"
 	@echo "  kubectl apply -f kubernetes/workload-identity.yaml"
 	@echo "  kubectl apply -f kubernetes/performance-budget-policy.yaml"

@@ -17,6 +17,7 @@ from .governance import build_governance_bundle
 from .identity import build_identity_access_report
 from .incidents import create_incidents
 from .io import read_csv, write_json
+from .kuberay_capacity import build_kuberay_capacity_plan
 from .network_security import build_network_security_report
 from .orchestration_scorecard import build_orchestration_scorecard
 from .policy_audit import audit_platform_policy
@@ -58,6 +59,7 @@ def demo(output: str | Path) -> dict:
     )
     device_allocation = build_device_allocation_plan(root)
     topology_placement = build_topology_placement_plan(root)
+    kuberay_capacity = build_kuberay_capacity_plan(root)
     tenancy = build_tenancy_report(root)
     identity_access = build_identity_access_report(root)
     performance_budget = build_performance_budget_report(root)
@@ -100,6 +102,7 @@ def demo(output: str | Path) -> dict:
         "accelerator_capacity": accelerator_capacity,
         "device_allocation": device_allocation,
         "topology_placement": topology_placement,
+        "kuberay_capacity": kuberay_capacity,
         "tenancy": tenancy,
         "identity_access": identity_access,
         "performance_budget": performance_budget,
@@ -152,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         "accelerator-plan",
         "device-plan",
         "topology-plan",
+        "kuberay-plan",
         "tenancy-report",
         "identity-report",
         "performance-budget",
@@ -195,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_device_allocation_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "topology-plan":
         print(json.dumps(build_topology_placement_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "kuberay-plan":
+        print(json.dumps(build_kuberay_capacity_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "tenancy-report":
         print(json.dumps(build_tenancy_report(args.output), indent=2, sort_keys=True))
     elif args.command == "identity-report":

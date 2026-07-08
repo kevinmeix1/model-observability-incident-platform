@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-ray-entrypoints
+  namespace: ml-observability
+data:
+  incident_root_cause.py: |
+    import ray
+
+    ray.init()
+
+    @ray.remote
+    def inspect(model, check):
+        return {"model": model, "check": check, "root_cause": "drift_plus_latency"}
+
+    models = ["credit-risk", "churn-risk", "demand-forecast"]
+    checks = ["feature_drift", "prediction_drift", "latency_slo", "freshness"]
+    print(ray.get([inspect.remote(model, check) for model in models for check in checks]))
+---
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: incident-root-cause-fanout
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/component: kuberay-incident-fanout
+    kueue.x-k8s.io/queue-name: observability-checks-queue
+  annotations:
+    kueue.x-k8s.io/elastic-job: "true"
+spec:
+  shutdownAfterJobFinishes: true
+  entrypoint: python /home/ray/jobs/incident_root_cause.py
+  rayClusterSpec:
+    enableInTreeAutoscaling: true
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: 0.0.0.0
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: rayproject/ray@sha256:replace-with-approved-digest
+              ports:
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 6379
+                  name: gcs
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+              volumeMounts:
+                - name: job-code
+                  mountPath: /home/ray/jobs
+          volumes:
+            - name: job-code
+              configMap:
+                name: observability-ray-entrypoints
+    workerGroupSpecs:
+      - groupName: incident-workers
+        replicas: 2
+        minReplicas: 2
+        maxReplicas: 12
+        rayStartParams: {}
+        template:
+          spec:
+            containers:
+              - name: ray-worker
+                image: rayproject/ray@sha256:replace-with-approved-digest
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: 4Gi
+                  limits:
+                    cpu: "4"
+                    memory: 8Gi
+---
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: embedding-drift-diagnostic
+  namespace: ml-observability
+  labels:
+    app.kubernetes.io/component: kuberay-drift-diagnostic
+    kueue.x-k8s.io/queue-name: observability-gpu-queue
+  annotations:
+    kueue.x-k8s.io/elastic-job: "true"
+spec:
+  shutdownAfterJobFinishes: true
+  entrypoint: python -c "import ray; ray.init(); print('embedding drift diagnostic admitted')"
+  rayClusterSpec:
+    enableInTreeAutoscaling: true
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: 0.0.0.0
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: rayproject/ray@sha256:replace-with-approved-digest
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: 1Gi
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+    workerGroupSpecs:
+      - groupName: drift-gpu-workers
+        replicas: 0
+        minReplicas: 0
+        maxReplicas: 6
+        rayStartParams: {}
+        template:
+          spec:
+            containers:
+              - name: ray-worker
+                image: rayproject/ray@sha256:replace-with-approved-digest
+                resources:
+                  requests:
+                    cpu: "4"
+                    memory: 16Gi
+                    nvidia.com/gpu: "1"
+                  limits:
+                    cpu: "8"
+                    memory: 32Gi
+                    nvidia.com/gpu: "1"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kuberay-observability-diagnostics
+  namespace: ml-observability
+spec:
+  groups:
+    - name: kuberay.observability.diagnostics
+      rules:
+        - alert: ObservabilityRayIncidentFanoutDelayed
+          expr: ray_cluster_pending_nodes{ray_io_cluster=~"incident-.*"} > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Incident root-cause Ray workers are pending; keep rollout freeze active."

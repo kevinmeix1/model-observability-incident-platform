@@ -107,6 +107,16 @@ if AIRFLOW_AVAILABLE:
                 "kubectl get localqueue observability-checks-queue -n ml-observability",
                 priority_weight=4,
             )
+            submit_ray_incident_fanout = monitor_pod(
+                "submit_kuberay_incident_fanout",
+                "kubectl apply -f kubernetes/kuberay-kueue-workloads.yaml",
+                priority_weight=6,
+            )
+            wait_for_ray_incident_fanout = monitor_pod(
+                "wait_for_kuberay_incident_fanout_deferrable",
+                "kubectl wait --for=condition=Complete rayjob/incident-root-cause-fanout -n ml-observability --timeout=20m",
+                priority_weight=6,
+            )
             check_alert_budget = monitor_pod(
                 "check_alert_budget_burn_rate",
                 "python -m model_observability_platform demo",
@@ -117,7 +127,7 @@ if AIRFLOW_AVAILABLE:
                 "kubectl wait --for=condition=Accepted httproute/model-observability-dashboard-route -n ml-observability --timeout=5m",
                 priority_weight=3,
             )
-            reserve_observability_quota >> check_alert_budget >> wait_for_dashboard_route
+            reserve_observability_quota >> submit_ray_incident_fanout >> wait_for_ray_incident_fanout >> check_alert_budget >> wait_for_dashboard_route
             return wait_for_dashboard_route
 
         branch = BranchPythonOperator(task_id="branch_on_top_severity", python_callable=lambda: "rollback_recommendation")

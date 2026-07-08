@@ -100,6 +100,8 @@ For concrete DRA ResourceClaimTemplates, Kueue-coupled diagnostic admission, and
 
 For Kueue topology-aware diagnostics, telemetry collector spread, and incident-safe placement fallbacks, see [topology-aware scheduling](docs/topology-aware-scheduling.md).
 
+For KubeRay incident fanout, Kueue priority queues, optional GPU drift diagnostics, and rollout-freeze fallbacks, see [KubeRay and Kueue](docs/kuberay-kueue.md).
+
 For incident, drift, and retention tenant quotas, Kueue cohorts, Airflow pools, chargeback labels, and noisy-neighbor controls, see [multi-tenant fairness](docs/multi-tenant-fairness.md).
 
 For projected service-account tokens, External Secrets, SPIFFE identities, and keyless observability task access, see [workload identity](docs/workload-identity.md).

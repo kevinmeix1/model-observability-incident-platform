@@ -26,6 +26,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Accelerator Plan", "accelerator_capacity_plan.json", "GPU, DRA, Kueue, MIG, and time-slicing plan for monitor workloads."),
         ("Device Allocation", "device_allocation_plan.json", "DRA ResourceClaim templates, Kueue coupling, diagnostic fallbacks, and incident-path guardrails."),
         ("Topology Placement", "topology_placement_plan.json", "Kueue TAS, collector spread, optional GPU diagnostic locality, and incident fallbacks."),
+        ("KubeRay Capacity", "kuberay_capacity_plan.json", "Incident fanout RayJobs, Kueue priority queues, optional GPU diagnostics, and rollout-freeze fallback."),
         ("Performance Budget", "performance_budget.json", "Detection latency, incident creation, coverage, routing, and dashboard gates."),
         ("Queue Simulation", "queue_simulation.json", "Kueue quota, incident priority, GPU diagnostics, Airflow pool, and preemption simulation."),
         ("Release Admission", "release_admission_decision.json", "Fail-closed rollout freeze record combining incidents, SLOs, queues, governance, and provenance."),

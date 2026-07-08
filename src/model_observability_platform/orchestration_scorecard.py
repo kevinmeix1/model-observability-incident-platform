@@ -63,6 +63,7 @@ def build_orchestration_scorecard(
         ("indexed_job_resilience", _present(content, "indexed_job_resilience_plan.json", "backoffLimitPerIndex", "podFailurePolicy") and _present(content, "successPolicy", "airflow backfill create"), "Indexed Jobs use per-shard retry budgets, success policy, pod failure policy, and bounded Airflow incident recovery"),
         ("provisioning_admission_checks", _present(content, "provisioning_admission_plan.json", "ProvisioningRequestConfig", "kueue.x-k8s.io/provisioning-request") and _present(content, "incident_path_prioritized", "check-capacity.autoscaling.x-k8s.io"), "Kueue ProvisioningRequest admission confirms physical capacity for incident diagnostics while fresh alerts stay prioritized"),
         ("multikueue_dispatch", _present(content, "multikueue_dispatch_plan.json", "MultiKueueConfig", "MultiKueueCluster") and _present(content, "fresh_incidents_before_backfills", "status.clusterName"), "Kueue MultiKueue dispatch covers incident worker clusters, status sync, repair freezes, and GPU diagnostic fallback"),
+        ("incident_image_volume_evidence", _present(content, "incident_evidence_volume_plan.json", "spec.volumes[*].image", "incident-evidence-volumes") and _present(content, "pullPolicy: IfNotPresent", "observability-evidence-volume-smoke"), "Kubernetes image volumes mount digest-pinned incident evidence before Airflow starts diagnostic fanout"),
         ("event_driven_scaling", _present(content, "ScaledObject", "ScaledJob"), "KEDA ScaledObjects or ScaledJobs react to operational backlog"),
         ("horizontal_autoscaling", "HorizontalPodAutoscaler" in content, "HPA rules keep workers and services elastic"),
         ("opentelemetry", _present(content, "opentelemetry-collector", "OpenTelemetry"), "OTel collector config captures runtime traces and metrics"),
@@ -97,6 +98,7 @@ def build_orchestration_scorecard(
             "Kubernetes Indexed Jobs with backoffLimitPerIndex, successPolicy, podFailurePolicy, and Airflow 3 backfill create controls",
             "Kueue ProvisioningRequest AdmissionChecks for incident diagnostics, GPU drift probes, and rollout-freeze capacity guarantees",
             "Kueue MultiKueue for manager-to-worker incident dispatch, Workload status sync, and repair automation freeze semantics",
+            "Kubernetes v1.36 image volumes for read-only incident evidence bundles with rollout-freeze fallback semantics",
             "GitHub artifact attestations, SLSA provenance, and Sigstore policy-controller for supply-chain integrity",
         ],
         "next_actions": [

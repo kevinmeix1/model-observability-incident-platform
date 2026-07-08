@@ -17,6 +17,7 @@ from model_observability_platform.elastic_workload import build_elastic_workload
 from model_observability_platform.gitops_release import build_gitops_plan
 from model_observability_platform.governance import build_governance_bundle
 from model_observability_platform.identity import build_identity_access_report
+from model_observability_platform.incident_evidence_volume import build_incident_evidence_volume_plan
 from model_observability_platform.incidents import create_incidents
 from model_observability_platform.indexed_job_resilience import build_indexed_job_resilience_plan
 from model_observability_platform.inference_gateway import build_inference_gateway_plan
@@ -53,6 +54,8 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["KubernetesPodOperator", "task_group", "BranchPythonOperator", "Asset", "expand("]:
             self.assertIn(expected, dag_text)
         for expected in ["deferrable=True", "pod_template_file", "slo_budget_and_capacity", "reserve_kueue_observability_quota"]:
+            self.assertIn(expected, dag_text)
+        for expected in ["OBSERVABILITY_IMAGE", "2026.07.0", "image_pull_policy=\"IfNotPresent\"", "verify_incident_evidence_bundles"]:
             self.assertIn(expected, dag_text)
         for expected in ["CronJob", "RoleBinding", "ConfigMap", "PSI_THRESHOLD", "securityContext", "kueue.x-k8s.io/queue-name"]:
             self.assertIn(expected, workload_text)
@@ -317,7 +320,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "multikueue_dispatch_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -533,6 +536,29 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["MultiKueue Incident Dispatch", "fresh incident", "status.clusterName", "repair automation"]:
             self.assertIn(expected, docs)
 
+    def test_incident_evidence_volume_plan_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "incident-evidence-volumes.yaml").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "incident-evidence-volumes.md").read_text(encoding="utf-8")
+        dag = (repo / "airflow" / "dags" / "model_reliability_control_plane_dag.py").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_incident_evidence_volume_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_observability_image_volume_evidence")
+            self.assertEqual(report["feature"]["feature_state"], "Kubernetes v1.36 stable")
+            self.assertTrue(report["status_gates"]["rollout_freeze_preserved_on_missing_evidence"])
+            self.assertTrue(all("@sha256:" in bundle["reference"] for bundle in report["evidence_bundles"]))
+            self.assertTrue(any(check["name"] == "rollout_freeze_fallback" for check in report["checks"]))
+            self.assertTrue((root / "reports" / "incident_evidence_volume_plan.json").exists())
+        for expected in ["image:", "reference: ghcr.io/kevinmeix1/observability-reference-window@sha256", "pullPolicy: IfNotPresent", "readOnly: true", "observability-evidence-volume-smoke", "observability-evidence-volume-warmup"]:
+            self.assertIn(expected, manifest)
+        for expected in ["Incident Evidence Volumes", "Kubernetes v1.36", "object-store evidence path", "rollout freeze"]:
+            self.assertIn(expected, docs)
+        for expected in ["verify_incident_evidence_bundles", "kubernetes/incident-evidence-volumes.yaml", "IfNotPresent"]:
+            self.assertIn(expected, dag)
+
     def test_tenancy_fairness_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         manifest = (repo / "kubernetes" / "multitenancy-fairness.yaml").read_text(encoding="utf-8")
@@ -580,6 +606,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("indexed_job_resilience", names)
             self.assertIn("provisioning_admission_checks", names)
             self.assertIn("multikueue_dispatch", names)
+            self.assertIn("incident_image_volume_evidence", names)
             self.assertIn("supply_chain_provenance", names)
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
@@ -630,6 +657,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "indexed_job_resilience_plan.json",
                 "provisioning_admission_plan.json",
                 "multikueue_dispatch_plan.json",
+                "incident_evidence_volume_plan.json",
                 "tenancy_fairness_report.json",
                 "identity_access_report.json",
                 "performance_budget.json",
@@ -685,6 +713,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "elastic_workload_plan.json").exists())
             self.assertTrue((root / "reports" / "indexed_job_resilience_plan.json").exists())
             self.assertTrue((root / "reports" / "multikueue_dispatch_plan.json").exists())
+            self.assertTrue((root / "reports" / "incident_evidence_volume_plan.json").exists())
             self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "identity_access_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())

@@ -1,4 +1,4 @@
-.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan topology-plan kuberay-plan inference-gateway-plan semantic-telemetry-plan deadline-alerts-plan cost-observability elastic-workload-plan indexed-job-resilience provisioning-admission multikueue-dispatch tenancy-report identity-report performance-budget queue-simulation release-admission ci-verify kubernetes-plan minikube-up test clean
+.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan topology-plan kuberay-plan inference-gateway-plan semantic-telemetry-plan deadline-alerts-plan cost-observability elastic-workload-plan indexed-job-resilience provisioning-admission multikueue-dispatch tenancy-report identity-report performance-budget queue-simulation incident-evidence-volumes release-admission ci-verify kubernetes-plan minikube-up test clean
 
 demo:
 	PYTHONPATH=src python3 -m model_observability_platform demo --output .local
@@ -90,6 +90,9 @@ performance-budget:
 queue-simulation:
 	PYTHONPATH=src python3 -m model_observability_platform queue-simulation --output .local
 
+incident-evidence-volumes:
+	PYTHONPATH=src python3 -m model_observability_platform incident-evidence-volumes --output .local
+
 release-admission:
 	PYTHONPATH=src python3 -m model_observability_platform release-admission --output .local
 
@@ -118,6 +121,7 @@ ci-verify:
 	test -f .local/reports/identity_access_report.json
 	test -f .local/reports/performance_budget.json
 	test -f .local/reports/queue_simulation.json
+	test -f .local/reports/incident_evidence_volume_plan.json
 	test -f .local/reports/release_admission_decision.json
 	test -f .local/supply-chain/subject.checksums.txt
 	python3 -m json.tool .local/reports/governance_evidence_bundle.json >/dev/null
@@ -141,6 +145,7 @@ ci-verify:
 	python3 -m json.tool .local/reports/identity_access_report.json >/dev/null
 	python3 -m json.tool .local/reports/performance_budget.json >/dev/null
 	python3 -m json.tool .local/reports/queue_simulation.json >/dev/null
+	python3 -m json.tool .local/reports/incident_evidence_volume_plan.json >/dev/null
 	python3 -m json.tool .local/reports/release_admission_decision.json >/dev/null
 
 kubernetes-plan:
@@ -166,6 +171,7 @@ minikube-up:
 	@echo "  kubectl apply -f kubernetes/indexed-job-resilience.yaml"
 	@echo "  kubectl apply -f kubernetes/provisioning-admission-checks.yaml"
 	@echo "  kubectl apply -f kubernetes/multikueue-dispatch.yaml"
+	@echo "  kubectl apply -f kubernetes/incident-evidence-volumes.yaml"
 	@echo "  kubectl apply -f kubernetes/inference-gateway-routing.yaml"
 	@echo "  kubectl apply -f kubernetes/multitenancy-fairness.yaml"
 	@echo "  kubectl apply -f kubernetes/workload-identity.yaml"

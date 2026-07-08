@@ -17,13 +17,15 @@ except Exception:
 
 MODELS = ["credit-risk", "churn-risk", "demand-forecast"]
 CHECKS = ["feature_drift", "prediction_drift", "latency_slo", "error_rate", "freshness"]
+OBSERVABILITY_IMAGE = "ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0"
 
 
 def monitor_pod(task_id: str, command: str, *, priority_weight: int = 1):
     return KubernetesPodOperator(
         task_id=task_id,
         namespace="ml-observability",
-        image="ghcr.io/kevinmeix1/model-observability-incident-platform:latest",
+        image=OBSERVABILITY_IMAGE,
+        image_pull_policy="IfNotPresent",
         cmds=["bash", "-lc"],
         arguments=[command],
         service_account_name="model-observability-runner",
@@ -42,7 +44,7 @@ def monitor_pod(task_id: str, command: str, *, priority_weight: int = 1):
         priority_weight=priority_weight,
         retries=2,
         retry_delay=timedelta(minutes=2),
-        labels={"platform": "model-observability", "task": task_id},
+        labels={"platform": "model-observability", "task": task_id, "evidence-locality": "oci-image-volume"},
     )
 
 
@@ -107,6 +109,11 @@ if AIRFLOW_AVAILABLE:
                 "kubectl get localqueue observability-checks-queue -n ml-observability",
                 priority_weight=4,
             )
+            verify_evidence_bundles = monitor_pod(
+                "verify_incident_evidence_bundles",
+                "kubectl apply -f kubernetes/incident-evidence-volumes.yaml && kubectl wait --for=condition=Complete job/observability-evidence-volume-smoke -n ml-observability --timeout=8m",
+                priority_weight=7,
+            )
             submit_ray_incident_fanout = monitor_pod(
                 "submit_kuberay_incident_fanout",
                 "kubectl apply -f kubernetes/kuberay-kueue-workloads.yaml",
@@ -127,7 +134,7 @@ if AIRFLOW_AVAILABLE:
                 "kubectl wait --for=condition=Accepted httproute/model-observability-dashboard-route -n ml-observability --timeout=5m",
                 priority_weight=3,
             )
-            reserve_observability_quota >> submit_ray_incident_fanout >> wait_for_ray_incident_fanout >> check_alert_budget >> wait_for_dashboard_route
+            reserve_observability_quota >> verify_evidence_bundles >> submit_ray_incident_fanout >> wait_for_ray_incident_fanout >> check_alert_budget >> wait_for_dashboard_route
             return wait_for_dashboard_route
 
         branch = BranchPythonOperator(task_id="branch_on_top_severity", python_callable=lambda: "rollback_recommendation")

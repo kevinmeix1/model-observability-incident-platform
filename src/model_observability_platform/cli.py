@@ -18,6 +18,7 @@ from .elastic_workload import build_elastic_workload_plan
 from .gitops_release import build_gitops_plan
 from .governance import build_governance_bundle
 from .identity import build_identity_access_report
+from .incident_evidence_volume import build_incident_evidence_volume_plan
 from .incidents import create_incidents
 from .indexed_job_resilience import build_indexed_job_resilience_plan
 from .inference_gateway import build_inference_gateway_plan
@@ -80,6 +81,7 @@ def demo(output: str | Path) -> dict:
     identity_access = build_identity_access_report(root)
     performance_budget = build_performance_budget_report(root)
     queue_simulation = build_queue_simulation(root)
+    incident_evidence_volume = build_incident_evidence_volume_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -131,6 +133,7 @@ def demo(output: str | Path) -> dict:
         "identity_access": identity_access,
         "performance_budget": performance_budget,
         "queue_simulation": queue_simulation,
+        "incident_evidence_volume": incident_evidence_volume,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
@@ -192,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         "identity-report",
         "performance-budget",
         "queue-simulation",
+        "incident-evidence-volumes",
         "release-admission",
     ]:
         cmd = sub.add_parser(command)
@@ -257,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_performance_budget_report(args.output), indent=2, sort_keys=True))
     elif args.command == "queue-simulation":
         print(json.dumps(build_queue_simulation(args.output), indent=2, sort_keys=True))
+    elif args.command == "incident-evidence-volumes":
+        print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":
         print(json.dumps(build_release_admission_decision(args.output), indent=2, sort_keys=True))
     return 0

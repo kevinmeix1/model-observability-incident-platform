@@ -110,6 +110,8 @@ For Kueue ProvisioningRequest admission checks that protect incident diagnostics
 
 For Kueue MultiKueue cross-cluster incident dispatch, worker status sync, repair automation freeze semantics, and GPU diagnostic fallback, see [MultiKueue incident dispatch](docs/multikueue-dispatch.md).
 
+For Kubernetes image-volume incident evidence mounts, digest-pinned reference windows, policy bundles, golden incidents, runbooks, and object-store fallback semantics, see [incident evidence volumes](docs/incident-evidence-volumes.md).
+
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).
 
 For OTel, Kubernetes, GenAI-style, SLO, and incident telemetry attributes with collector-side payload redaction, see [semantic telemetry contract](docs/semantic-telemetry.md).

@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .accelerator_plan import build_accelerator_capacity_plan
 from .artifact_index import render_artifact_index
 from .chaos import run_chaos_drill
 from .checks import run_checks
@@ -43,6 +44,11 @@ def demo(output: str | Path) -> dict:
     governance_bundle = build_governance_bundle(root)
     slo_error_budget = build_slo_report(root)
     cloud_migration = build_cloud_migration_plan(root)
+    accelerator_capacity = build_accelerator_capacity_plan(
+        root,
+        project="Model Observability Incident Platform",
+        primary_workload="telemetry diagnostics, drift checks, and incident review probes",
+    )
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -77,6 +83,7 @@ def demo(output: str | Path) -> dict:
         "governance_bundle": governance_bundle,
         "slo_error_budget": slo_error_budget,
         "cloud_migration": cloud_migration,
+        "accelerator_capacity": accelerator_capacity,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
         "orchestration_scorecard": orchestration_scorecard,
@@ -121,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         "cloud-plan",
         "supply-chain",
         "orchestration-scorecard",
+        "accelerator-plan",
     ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
@@ -153,4 +161,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_supply_chain_evidence(args.output, project="Model Observability Incident Platform", artifact_name="model-observability-demo-artifacts", workflow="Model Observability CI", namespace="mlops-observability"), indent=2, sort_keys=True))
     elif args.command == "orchestration-scorecard":
         print(json.dumps(build_orchestration_scorecard(args.output, project="Model Observability Incident Platform"), indent=2, sort_keys=True))
+    elif args.command == "accelerator-plan":
+        print(json.dumps(build_accelerator_capacity_plan(args.output, project="Model Observability Incident Platform", primary_workload="telemetry diagnostics, drift checks, and incident review probes"), indent=2, sort_keys=True))
     return 0

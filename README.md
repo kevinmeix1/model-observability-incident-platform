@@ -1,5 +1,7 @@
 # Model Observability + Incident Response Platform
 
+[![Model Observability CI](https://github.com/kevinmeix1/model-observability-incident-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinmeix1/model-observability-incident-platform/actions/workflows/ci.yml)
+
 A production-style model reliability project that detects feature drift, prediction drift, serving SLO failures, freshness issues, and data quality problems, then creates idempotent incidents with severity, likely root cause, and next action guidance.
 
 The default demo is local-first and dependency-light. The design maps cleanly to Evidently, Prometheus, OpenTelemetry, Grafana, PagerDuty, and warehouse-backed model monitoring.

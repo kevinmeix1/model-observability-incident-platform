@@ -26,6 +26,7 @@ from model_observability_platform.queue_simulator import build_queue_simulation
 from model_observability_platform.release_admission import build_release_admission_decision, evaluate_release_admission
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
+from model_observability_platform.semantic_telemetry import build_semantic_telemetry_plan
 from model_observability_platform.slo import build_slo_report
 from model_observability_platform.supply_chain import build_supply_chain_evidence
 from model_observability_platform.tenancy import build_tenancy_report
@@ -172,8 +173,12 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(trace["span_count"], 5)
             self.assertEqual(trace["root_service"], "collector")
             self.assertTrue(any(span["name"] == "incident.dedupe" for span in trace["spans"]))
+            ingest_attrs = trace["spans"][0]["attributes"]
+            self.assertEqual(ingest_attrs["gen_ai.request.model"], "credit-risk-v2")
+            self.assertEqual(ingest_attrs["gen_ai.usage.input_tokens"], 96)
+            self.assertTrue(any(span["attributes"].get("incident.severity") == "high" for span in trace["spans"]))
             self.assertTrue((Path(tmp) / "reports" / "trace_report.json").exists())
-        for expected in ["kind: ConfigMap", "otlp", "k8sattributes", "memory_limiter", "prometheus", "batch"]:
+        for expected in ["kind: ConfigMap", "otlp", "k8sattributes", "memory_limiter", "attributes/semantic_redaction", "gen_ai.input.messages", "incident.payload", "prometheus", "batch"]:
             self.assertIn(expected, collector)
 
     def test_chaos_drill_and_chaos_mesh_assets_exist(self) -> None:
@@ -306,7 +311,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -395,6 +400,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["Gateway API Inference Extension", "InferencePool", "Endpoint Picker", "incident"]:
             self.assertIn(expected, docs)
 
+    def test_semantic_telemetry_plan_and_collector_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        collector = (repo / "kubernetes" / "opentelemetry-collector.yaml").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "semantic-telemetry.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_semantic_telemetry_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enforce_semantic_telemetry_contract")
+            self.assertIn("incident.root_cause", report["schema"]["required_attributes"])
+            self.assertIn("gen_ai.input.messages", report["schema"]["redacted_attributes"])
+            self.assertTrue((root / "reports" / "semantic_telemetry_plan.json").exists())
+        for expected in ["attributes/semantic_redaction", "deployment.environment.name", "incident.routing.mode", "gen_ai.output.messages"]:
+            self.assertIn(expected, collector)
+        for expected in ["Semantic Telemetry", "GenAI-style", "payload", "incident"]:
+            self.assertIn(expected, docs)
+
     def test_tenancy_fairness_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         manifest = (repo / "kubernetes" / "multitenancy-fairness.yaml").read_text(encoding="utf-8")
@@ -435,6 +458,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertGreaterEqual(scorecard["score"], 90.0)
             self.assertIn("dynamic_task_mapping", names)
             self.assertIn("kueue_admission", names)
+            self.assertIn("semantic_telemetry_contract", names)
             self.assertIn("supply_chain_provenance", names)
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
@@ -478,6 +502,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "topology_placement_plan.json",
                 "kuberay_capacity_plan.json",
                 "inference_gateway_plan.json",
+                "semantic_telemetry_plan.json",
                 "tenancy_fairness_report.json",
                 "identity_access_report.json",
                 "performance_budget.json",
@@ -527,6 +552,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "topology_placement_plan.json").exists())
             self.assertTrue((root / "reports" / "kuberay_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "inference_gateway_plan.json").exists())
+            self.assertTrue((root / "reports" / "semantic_telemetry_plan.json").exists())
             self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "identity_access_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())

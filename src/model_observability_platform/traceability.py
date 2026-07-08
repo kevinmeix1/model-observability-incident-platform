@@ -28,11 +28,78 @@ def span(trace_id: str, name: str, *, parent: str | None, service: str, duration
 def build_trace_report(root: str | Path) -> dict:
     root = Path(root)
     trace_id = _hex("model-observability-incident-trace", 32)
-    ingest = span(trace_id, "telemetry.ingest", parent=None, service="collector", duration_ms=90.0, attributes={"source": "prediction_logs"})
-    drift = span(trace_id, "checks.drift", parent=ingest["span_id"], service="observability-api", duration_ms=130.0, attributes={"method": "psi"})
-    slo = span(trace_id, "checks.slo", parent=ingest["span_id"], service="observability-api", duration_ms=45.0, attributes={"slo": "latency_p95"})
-    incident = span(trace_id, "incident.dedupe", parent=drift["span_id"], service="incident-manager", duration_ms=18.0, attributes={"key": "fingerprint"})
-    route = span(trace_id, "alert.route", parent=incident["span_id"], service="alert-router", duration_ms=9.0, attributes={"channel": "ml-reliability"})
+    ingest = span(
+        trace_id,
+        "telemetry.ingest",
+        parent=None,
+        service="collector",
+        duration_ms=90.0,
+        attributes={
+            "service.name": "model-observability-collector",
+            "source": "prediction_logs",
+            "k8s.namespace.name": "ml-observability",
+            "k8s.pod.name": "observability-otel-collector-0",
+            "gen_ai.request.model": "credit-risk-v2",
+            "gen_ai.response.model": "credit-risk-v2",
+            "gen_ai.usage.input_tokens": 96,
+            "gen_ai.usage.output_tokens": 12,
+            "inference.estimated_cost_usd": 0.00021,
+        },
+    )
+    drift = span(
+        trace_id,
+        "checks.drift",
+        parent=ingest["span_id"],
+        service="observability-api",
+        duration_ms=130.0,
+        attributes={
+            "service.name": "drift-evaluator",
+            "method": "psi",
+            "ml.model.version": "credit-risk-v2@sha256:demo",
+            "inference.gateway.objective": "low-latency-risk",
+            "k8s.cronjob.name": "drift-evaluator",
+        },
+    )
+    slo = span(
+        trace_id,
+        "checks.slo",
+        parent=ingest["span_id"],
+        service="observability-api",
+        duration_ms=45.0,
+        attributes={
+            "service.name": "slo-evaluator",
+            "slo.name": "latency_p95",
+            "slo.burn_rate": 8.4,
+        },
+    )
+    incident = span(
+        trace_id,
+        "incident.dedupe",
+        parent=drift["span_id"],
+        service="incident-manager",
+        duration_ms=18.0,
+        attributes={
+            "service.name": "incident-manager",
+            "key": "fingerprint",
+            "incident.id": "inc_model_reliability_demo",
+            "incident.severity": "high",
+            "incident.root_cause": "compound_population_shift_and_serving_degradation",
+            "incident.detection_latency_ms": 238,
+        },
+    )
+    route = span(
+        trace_id,
+        "alert.route",
+        parent=incident["span_id"],
+        service="alert-router",
+        duration_ms=9.0,
+        attributes={
+            "service.name": "alert-router",
+            "channel": "ml-reliability",
+            "incident.id": "inc_model_reliability_demo",
+            "incident.severity": "high",
+        },
+    )
     spans = [ingest, drift, slo, incident, route]
     report = {
         "trace_id": trace_id,

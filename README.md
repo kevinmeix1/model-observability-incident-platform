@@ -102,6 +102,8 @@ For Kueue topology-aware diagnostics, telemetry collector spread, and incident-s
 
 For KubeRay incident fanout, Kueue priority queues, optional GPU drift diagnostics, and rollout-freeze fallbacks, see [KubeRay and Kueue](docs/kuberay-kueue.md).
 
+For Kueue Workload Slices, JobSet incident fanout, drift-backlog replacement slices, GPU diagnostics, and rollout-freeze capacity recovery, see [Kueue elastic workloads](docs/kueue-elastic-workloads.md).
+
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).
 
 For OTel, Kubernetes, GenAI-style, SLO, and incident telemetry attributes with collector-side payload redaction, see [semantic telemetry contract](docs/semantic-telemetry.md).

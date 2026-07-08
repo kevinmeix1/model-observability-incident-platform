@@ -142,6 +142,8 @@ For OpenCost incident-path budgets, telemetry retention cost, GPU diagnostic spe
 
 For Kueue `VisibilityOnDemand`, pending workload API queries, incident queue triage, and admission-wait alerts, see [Kueue pending workload visibility](docs/kueue-pending-workload-visibility.md).
 
+For Kubernetes v1.36 Workload/PodGroup readiness across incident root-cause fanout, drift backlog diagnostics, rollout-freeze smoke, topology constraints, DRA sharing, and workload-aware preemption, see [workload-aware scheduling](docs/workload-aware-scheduling.md).
+
 For incident, drift, and retention tenant quotas, Kueue cohorts, Airflow pools, chargeback labels, and noisy-neighbor controls, see [multi-tenant fairness](docs/multi-tenant-fairness.md).
 
 For projected service-account tokens, External Secrets, SPIFFE identities, and keyless observability task access, see [workload identity](docs/workload-identity.md).

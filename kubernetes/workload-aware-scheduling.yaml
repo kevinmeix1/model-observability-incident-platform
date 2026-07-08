@@ -1,0 +1,116 @@
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: PodGroup
+metadata:
+  name: incident-root-cause-pg
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: incident-root-cause-fanout
+    platform.mlops.dev/control: workload-aware-scheduling
+spec:
+  priorityClassName: incident-response-critical
+  priority: 1000
+  disruptionMode: PodGroup
+  schedulingPolicy:
+    gang:
+      minCount: 4
+  schedulingConstraints:
+    topology:
+      - key: topology.kubernetes.io/zone
+  resourceClaims:
+    - name: incident-diagnostic-cpu-claim
+      resourceClaimTemplateName: incident-diagnostic-gpu-claim-template
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: incident-diagnostic-gpu-claim-template
+  namespace: mlops-observability
+spec:
+  spec:
+    devices:
+      requests:
+        - name: diagnostic-gpu
+          deviceClassName: gpu-l4-shared
+          allocationMode: All
+          count: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: incident-root-cause-indexed-job
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: incident-root-cause-fanout
+    kueue.x-k8s.io/queue-name: incident-root-cause
+    platform.mlops.dev/workload-aware-scheduling: "candidate"
+  annotations:
+    scheduling.k8s.io/feature-gate: WorkloadWithJob
+    platform.mlops.dev/podgroup: incident-root-cause-pg
+spec:
+  completionMode: Indexed
+  parallelism: 4
+  completions: 4
+  backoffLimitPerIndex: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: incident-root-cause-fanout
+    spec:
+      restartPolicy: Never
+      priorityClassName: incident-response-critical
+      resourceClaims:
+        - name: incident-diagnostic-cpu-claim
+          resourceClaimTemplateName: incident-diagnostic-gpu-claim-template
+      containers:
+        - name: root-cause
+          image: ghcr.io/kevinmeix1/incident-root-cause@sha256:demo
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: JOB_COMPLETION_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+            - name: WORKLOAD_AWARE_SCHEDULING
+              value: "alpha-readiness"
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+---
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: PodGroup
+metadata:
+  name: drift-backlog-pg
+  namespace: mlops-observability
+spec:
+  priorityClassName: diagnostic-backlog
+  priority: 650
+  disruptionMode: PodGroup
+  schedulingPolicy:
+    gang:
+      minCount: 5
+  schedulingConstraints:
+    topology:
+      - key: topology.kubernetes.io/rack
+  resourceClaims:
+    - name: drift-diagnostic-gpu-claim
+      resourceClaimTemplateName: incident-diagnostic-gpu-claim-template
+---
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: PodGroup
+metadata:
+  name: rollout-freeze-smoke-pg
+  namespace: mlops-observability
+spec:
+  priorityClassName: rollout-freeze-critical
+  priority: 1100
+  disruptionMode: PodGroup
+  schedulingPolicy:
+    gang:
+      minCount: 3
+  schedulingConstraints:
+    topology:
+      - key: kubernetes.io/hostname

@@ -65,6 +65,7 @@ if AIRFLOW_AVAILABLE:
             "retry_delay": timedelta(minutes=2),
         },
         tags=["observability", "incident-response", "drift", "slo", "kubernetes"],
+        rerun_with_latest_version=False,
     )
     def model_reliability_control_plane():
         start = EmptyOperator(task_id="start_reliability_cycle")

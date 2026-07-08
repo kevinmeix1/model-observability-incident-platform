@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: telemetry-collector
+  namespace: ml-observability
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/telemetry-window-reader
+  labels:
+    app.kubernetes.io/part-of: model-observability-incident-platform
+    spiffe.io/spiffe-id: spiffe://mlops.local/ns/ml-observability/sa/telemetry-collector
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: drift-evaluator
+  namespace: ml-observability
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/drift-evaluator
+  labels:
+    app.kubernetes.io/part-of: model-observability-incident-platform
+    spiffe.io/spiffe-id: spiffe://mlops.local/ns/ml-observability/sa/drift-evaluator
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: incident-router
+  namespace: ml-observability
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/ml-incident-router
+  labels:
+    app.kubernetes.io/part-of: model-observability-incident-platform
+    spiffe.io/spiffe-id: spiffe://mlops.local/ns/ml-observability/sa/incident-router
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: incident-router-minimal
+  namespace: ml-observability
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-router-minimal
+  namespace: ml-observability
+subjects:
+  - kind: ServiceAccount
+    name: incident-router
+    namespace: ml-observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: incident-router-minimal
+---
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: observability-aws-secrets
+  namespace: ml-observability
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: incident-router
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: pager-webhook-token
+  namespace: ml-observability
+spec:
+  refreshInterval: 30m
+  secretStoreRef:
+    name: observability-aws-secrets
+    kind: SecretStore
+  target:
+    name: pager-webhook-token
+    creationPolicy: Owner
+  data:
+    - secretKey: token
+      remoteRef:
+        key: prod/observability/pager
+        property: token
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-workload-identity-policy
+  namespace: ml-observability
+data:
+  service_account_name: drift-evaluator
+  projected_token_audience: sts.amazonaws.com
+  projected_token_ttl_seconds: "3600"
+  kubernetes_pod_operator_default: "pin service_account_name for diagnostic checks"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: workload-identity-egress
+  namespace: ml-observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: model-observability-incident-platform
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443

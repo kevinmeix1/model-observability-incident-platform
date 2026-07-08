@@ -13,6 +13,7 @@ from .dashboard import render_dashboard
 from .disaster_recovery import build_disaster_recovery_plan
 from .gitops_release import build_gitops_plan
 from .governance import build_governance_bundle
+from .identity import build_identity_access_report
 from .incidents import create_incidents
 from .io import read_csv, write_json
 from .network_security import build_network_security_report
@@ -54,6 +55,7 @@ def demo(output: str | Path) -> dict:
         primary_workload="telemetry diagnostics, drift checks, and incident review probes",
     )
     tenancy = build_tenancy_report(root)
+    identity_access = build_identity_access_report(root)
     performance_budget = build_performance_budget_report(root)
     queue_simulation = build_queue_simulation(root)
     dashboard = render_dashboard(
@@ -93,6 +95,7 @@ def demo(output: str | Path) -> dict:
         "cloud_migration": cloud_migration,
         "accelerator_capacity": accelerator_capacity,
         "tenancy": tenancy,
+        "identity_access": identity_access,
         "performance_budget": performance_budget,
         "queue_simulation": queue_simulation,
         "release_admission": release_admission,
@@ -142,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         "orchestration-scorecard",
         "accelerator-plan",
         "tenancy-report",
+        "identity-report",
         "performance-budget",
         "queue-simulation",
         "release-admission",
@@ -181,6 +185,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_accelerator_capacity_plan(args.output, project="Model Observability Incident Platform", primary_workload="telemetry diagnostics, drift checks, and incident review probes"), indent=2, sort_keys=True))
     elif args.command == "tenancy-report":
         print(json.dumps(build_tenancy_report(args.output), indent=2, sort_keys=True))
+    elif args.command == "identity-report":
+        print(json.dumps(build_identity_access_report(args.output), indent=2, sort_keys=True))
     elif args.command == "performance-budget":
         print(json.dumps(build_performance_budget_report(args.output), indent=2, sort_keys=True))
     elif args.command == "queue-simulation":

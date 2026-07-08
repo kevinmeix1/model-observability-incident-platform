@@ -28,6 +28,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Queue Simulation", "queue_simulation.json", "Kueue quota, incident priority, GPU diagnostics, Airflow pool, and preemption simulation."),
         ("Release Admission", "release_admission_decision.json", "Fail-closed rollout freeze record combining incidents, SLOs, queues, governance, and provenance."),
         ("Tenant Fairness", "tenancy_fairness_report.json", "Incident, drift, and retention tenant quotas with Kueue cohorts and cost labels."),
+        ("Workload Identity", "identity_access_report.json", "Keyless identities for telemetry collection, drift evaluation, incident routing, and alerting."),
         ("Resource Optimization", "resource_optimization.json", "Requests, limits, HPA, VPA, KEDA, and capacity guidance for reliability checks."),
         ("Network Security", "network_security.json", "mTLS, network policy, and telemetry-to-incident access topology for the platform."),
         ("Chaos Drill", "chaos_drill_report.json", "Observability failure-injection scenarios with blast radius and recovery objectives."),

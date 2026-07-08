@@ -32,8 +32,31 @@ def observed_summary(check: dict) -> object:
         psi_scores = check.get("observed", {}).get("psi", {})
         failed = check.get("failed_features", [])
         max_psi = max(psi_scores.values(), default=0.0)
-        return f"{len(failed)} features, max PSI {max_psi}"
+        return f"{len(failed)} features, max PSI {max_psi:.3f}"
     return check.get("observed")
+
+
+def compact_text(value: object, display: str | None = None) -> str:
+    text = "" if value is None else str(value)
+    label = text if display is None else display
+    return f'<span class="nowrap" title="{esc(text)}">{esc(label)}</span>'
+
+
+def root_cause_label(value: object, *, compact: bool = False) -> str:
+    text = "" if value is None else str(value)
+    readable = text.replace("_", " ")
+    if text == "compound_population_shift_and_serving_degradation":
+        readable = "population shift + serving degradation"
+    if compact and readable == "population shift + serving degradation":
+        readable = "population shift + serving"
+    return compact_text(text, readable)
+
+
+def root_cause_summary(value: object) -> str:
+    text = "" if value is None else str(value)
+    if text == "compound_population_shift_and_serving_degradation":
+        return "population shift + serving degradation"
+    return text.replace("_", " ")
 
 
 def asset_chips(value: list[str]) -> str:
@@ -74,10 +97,10 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
     ]
     incident_rows = [
         {
-            "incident": incident["incident_id"][:16],
+            "incident": compact_text(incident["incident_id"], incident["incident_id"][:12]),
             "check": LABELS.get(incident["check"], incident["check"]),
             "severity": severity_badge(incident["severity"]),
-            "root": incident["root_cause"].replace("_", " "),
+            "root": root_cause_label(incident["root_cause"], compact=True),
             "status": incident["status"],
         }
         for incident in incident_summary.get("incidents", [])[-10:]
@@ -116,7 +139,17 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
         th,td {{ border-bottom:1px solid #e8edf3; padding:11px 12px; text-align:left; font-size:14px; overflow-wrap:anywhere; vertical-align:top; }}
         th {{ background:#f8fafc; color:#334155; }}
         tr:last-child td {{ border-bottom:0; }}
-        .badge,.sev {{ display:inline-block; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:800; }}
+        .checks col:nth-child(1) {{ width:25%; }}
+        .checks col:nth-child(2) {{ width:17%; }}
+        .checks col:nth-child(3) {{ width:17%; }}
+        .checks col:nth-child(4) {{ width:25%; }}
+        .checks col:nth-child(5) {{ width:16%; }}
+        .incidents col:nth-child(1) {{ width:19%; }}
+        .incidents col:nth-child(2) {{ width:24%; }}
+        .incidents col:nth-child(3) {{ width:17%; }}
+        .incidents col:nth-child(4) {{ width:28%; }}
+        .incidents col:nth-child(5) {{ width:12%; }}
+        .badge,.sev {{ display:inline-block; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:800; white-space:nowrap; }}
         .pass {{ color:#166534; background:#dcfce7; }}
         .fail {{ color:#991b1b; background:#fee2e2; }}
         .critical,.high {{ color:#991b1b; background:#fee2e2; }}
@@ -128,6 +161,7 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
         .summary div {{ border:1px solid #e3e9f0; border-radius:6px; padding:12px; min-height:74px; }}
         .summary span {{ display:block; color:#64748b; font-size:12px; margin-bottom:8px; }}
         .summary strong {{ display:block; font-size:18px; overflow-wrap:anywhere; }}
+        .nowrap {{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }}
         @media (max-width:900px) {{ header {{ padding:22px 18px; }} main {{ padding:18px; }} .layout {{ grid-template-columns:1fr; }} }}
       </style>
     </head>
@@ -147,11 +181,11 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
           <div>
             <div class="panel">
               <h2>Health Checks</h2>
-              <table><tr><th>Check</th><th>Status</th><th>Severity</th><th>Observed</th><th>Threshold</th></tr>{rows(check_rows, ['check', 'status', 'severity', 'observed', 'threshold'])}</table>
+              <table class="checks"><colgroup><col><col><col><col><col></colgroup><tr><th>Check</th><th>Status</th><th>Severity</th><th>Observed</th><th>Limit</th></tr>{rows(check_rows, ['check', 'status', 'severity', 'observed', 'threshold'])}</table>
             </div>
             <div class="panel">
               <h2>Open Incidents</h2>
-              <table><tr><th>Incident</th><th>Check</th><th>Severity</th><th>Root Cause</th><th>Status</th></tr>{rows(incident_rows, ['incident', 'check', 'severity', 'root', 'status'])}</table>
+              <table class="incidents"><colgroup><col><col><col><col><col></colgroup><tr><th>Incident</th><th>Check</th><th>Severity</th><th>Root Cause</th><th>State</th></tr>{rows(incident_rows, ['incident', 'check', 'severity', 'root', 'status'])}</table>
             </div>
           </div>
           <div>
@@ -167,7 +201,7 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
             <div class="panel">
               <h2>Root Cause Summary</h2>
               <div class="summary">
-                <div><span>Primary root cause</span><strong>{esc(incident_summary.get('incidents', [{}])[-1].get('root_cause', 'none')).replace('_', ' ')}</strong></div>
+                <div><span>Primary root cause</span><strong>{esc(root_cause_summary(incident_summary.get('incidents', [{}])[-1].get('root_cause', 'none')))}</strong></div>
                 <div><span>Incident status</span><strong>{esc('open' if incident_summary.get('open_count', 0) else 'clear')}</strong></div>
               </div>
             </div>

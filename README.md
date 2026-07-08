@@ -102,6 +102,8 @@ For Kubernetes v1.36 DRA `ResourceHealthStatus`, `ResourceClaim.status.devices`,
 
 For DRA prioritized alternatives, partitionable devices, consumable capacity, and binding-condition readiness for diagnostics, see [DRA advanced device sharing](docs/dra-advanced-device-sharing.md).
 
+For Kubernetes v1.36 DRA `AdminAccess` diagnostics with incident linkage, evidence-quality metadata, and rollout-freeze guardrails, see [Observability DRA AdminAccess diagnostics](docs/dra-admin-access-diagnostics.md).
+
 For Kueue topology-aware diagnostics, telemetry collector spread, and incident-safe placement fallbacks, see [topology-aware scheduling](docs/topology-aware-scheduling.md).
 
 For KubeRay incident fanout, Kueue priority queues, optional GPU drift diagnostics, and rollout-freeze fallbacks, see [KubeRay and Kueue](docs/kuberay-kueue.md).

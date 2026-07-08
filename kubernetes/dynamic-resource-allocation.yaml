@@ -1,0 +1,145 @@
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: gpu-l4-shared
+  labels:
+    platform.mlops.dev/device-tier: shared-diagnostics
+spec:
+  selectors:
+    - cel:
+        expression: "device.driver == 'gpu.resource.kubernetes.io'"
+---
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: gpu-a100-mig
+  labels:
+    platform.mlops.dev/device-tier: isolated-monitor-review
+spec:
+  selectors:
+    - cel:
+        expression: "device.driver == 'gpu.resource.kubernetes.io'"
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: l4-shared-drift
+  namespace: mlops-observability
+  labels:
+    platform.mlops.dev/workload: embedding-drift-check
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          exactly:
+            deviceClassName: gpu-l4-shared
+            allocationMode: ExactCount
+            count: 1
+      config:
+        - opaque:
+            driver: gpu.resource.kubernetes.io
+            parameters:
+              sharingStrategy: time-slicing
+              replicas: "4"
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: a100-mig-monitor
+  namespace: mlops-observability
+  labels:
+    platform.mlops.dev/workload: large-monitor-review
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          exactly:
+            deviceClassName: gpu-a100-mig
+            allocationMode: ExactCount
+            count: 1
+      config:
+        - opaque:
+            driver: gpu.resource.kubernetes.io
+            parameters:
+              sharingStrategy: mig
+              profile: 1g.10gb
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: embedding-drift-dra-check
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/component: device-allocation
+  annotations:
+    kueue.x-k8s.io/queue-name: drift-monitoring-queue
+    kueue.x-k8s.io/priority-class: observability-normal
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: drift-evaluator
+          restartPolicy: Never
+          resourceClaims:
+            - name: drift-gpu
+              resourceClaimTemplateName: l4-shared-drift
+          containers:
+            - name: embedding-drift
+              image: ghcr.io/kevinmeix1/model-observability@sha256:replace-with-digest
+              args: ["python", "-m", "model_observability_platform", "reliability-plan", "--output", "/workspace"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: incident-root-cause-probe
+  namespace: mlops-observability
+  annotations:
+    kueue.x-k8s.io/queue-name: incident-critical-queue
+    kueue.x-k8s.io/priority-class: observability-incident-critical
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      serviceAccountName: incident-router
+      restartPolicy: Never
+      containers:
+        - name: root-cause
+          image: ghcr.io/kevinmeix1/model-observability@sha256:replace-with-digest
+          args: ["python", "-m", "model_observability_platform", "demo", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-dra-resource-claims
+  namespace: mlops-observability
+spec:
+  groups:
+    - name: observability.dra.claims
+      rules:
+        - alert: ObservabilityDRAClaimPending
+          expr: kube_resourceclaim_status_phase{namespace="mlops-observability",phase="Pending"} > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "A DRA ResourceClaim is pending; fall back to CPU drift checks and keep incident routing live."

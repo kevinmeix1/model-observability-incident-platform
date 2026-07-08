@@ -9,6 +9,7 @@ from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
 from model_observability_platform.cloud_migration import build_cloud_migration_plan
 from model_observability_platform.cli import demo
+from model_observability_platform.device_allocation import build_device_allocation_plan
 from model_observability_platform.disaster_recovery import build_disaster_recovery_plan
 from model_observability_platform.gitops_release import build_gitops_plan
 from model_observability_platform.governance import build_governance_bundle
@@ -302,7 +303,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "tenancy_fairness_report.json", "identity_access_report.json", "release_admission_decision.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -318,6 +319,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("ResourceFlavor", manifest)
             self.assertIn("ResourceClaimTemplate", manifest)
             self.assertIn("nvidia.com/mig-1g.10gb", manifest)
+
+    def test_device_allocation_plan_and_dra_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "dynamic-resource-allocation.yaml").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "dynamic-resource-allocation.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_device_allocation_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "admit_dra_backed_diagnostics")
+            self.assertTrue(any(workload["resource_claim_template"] == "l4-shared-drift" for workload in report["workloads"]))
+            self.assertTrue(any(not workload["requires_dra"] for workload in report["workloads"]))
+            self.assertTrue((root / "reports" / "device_allocation_plan.json").exists())
+            for expected in ["DeviceClass", "ResourceClaimTemplate", "CronJob", "incident-root-cause-probe", "kueue.x-k8s.io/queue-name", "kube_resourceclaim_status_phase"]:
+                self.assertIn(expected, manifest)
+            for expected in ["Dynamic Resource Allocation", "time-slicing", "MIG", "CPU fallback", "ResourceClaim"]:
+                self.assertIn(expected, docs)
 
     def test_tenancy_fairness_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -398,6 +417,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "governance_evidence_bundle.json",
                 "slo_error_budget.json",
                 "accelerator_capacity_plan.json",
+                "device_allocation_plan.json",
                 "tenancy_fairness_report.json",
                 "identity_access_report.json",
                 "performance_budget.json",
@@ -443,6 +463,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "model_observability_dashboard.html").exists())
             self.assertTrue((root / "reports" / "index.html").exists())
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
+            self.assertTrue((root / "reports" / "device_allocation_plan.json").exists())
             self.assertTrue((root / "reports" / "tenancy_fairness_report.json").exists())
             self.assertTrue((root / "reports" / "identity_access_report.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())

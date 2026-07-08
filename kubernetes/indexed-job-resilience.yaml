@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: indexed-incident-job-runbook
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    platform.openai.com/component: indexed-job-resilience
+data:
+  airflowBackfillCreate: >-
+    airflow backfill create --dag-id model_reliability_control_plane --from-date 2026-07-01 --to-date 2026-07-07 --reprocess-behavior failed --max-active-runs 2 --run-backwards
+  shardContract: "JOB_COMPLETION_INDEX selects freshness, drift, root-cause, alert, rollback-freeze, or dashboard-publish work."
+  recoveryPolicy: "Recover failedIndexes only; keep incident creation and alert routing ahead of historical reruns."
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: observability-incident-indexed-resilience
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    app.kubernetes.io/component: indexed-job-resilience
+    kueue.x-k8s.io/queue-name: incident-critical-queue
+spec:
+  parallelism: 6
+  completions: 12
+  completionMode: Indexed
+  backoffLimitPerIndex: 1
+  maxFailedIndexes: 2
+  activeDeadlineSeconds: 5400
+  ttlSecondsAfterFinished: 86400
+  successPolicy:
+    rules:
+      - succeededCount: 10
+  podFailurePolicy:
+    rules:
+      - action: Ignore
+        onPodConditions:
+          - type: DisruptionTarget
+      - action: FailIndex
+        onExitCodes:
+          containerName: incident-shard
+          operator: In
+          values: [42]
+      - action: FailJob
+        onExitCodes:
+          containerName: incident-shard
+          operator: In
+          values: [78, 126]
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: incident-shard
+        incident-wave: indexed-resilience
+    spec:
+      serviceAccountName: incident-responder
+      restartPolicy: Never
+      containers:
+        - name: incident-shard
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+          command: ["bash", "-lc"]
+          args:
+            - >-
+              echo "running incident shard ${JOB_COMPLETION_INDEX}" &&
+              python -m model_observability_platform reliability-plan --output .local &&
+              python -m model_observability_platform trace-report --output .local
+          env:
+            - name: SHARD_SOURCE
+              value: "JOB_COMPLETION_INDEX"
+            - name: FAILURE_CONTRACT_EXIT_CODE
+              value: "42"
+          resources:
+            requests:
+              cpu: "750m"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: indexed-incident-job-alerts
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability-incident-platform
+    prometheus: platform
+spec:
+  groups:
+    - name: observability.indexed-job-resilience
+      rules:
+        - alert: ObservabilityIndexedJobFailedIndexesHigh
+          expr: kube_job_status_failed{namespace="mlops-observability",job_name=~"observability-incident-indexed.*"} > 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Indexed incident job exceeded failed-index budget.
+            runbook: "Inspect status.failedIndexes and recover only failed incident shards."
+        - alert: ObservabilityIndexedJobShardRetryHigh
+          expr: increase(kube_pod_container_status_restarts_total{namespace="mlops-observability",container="incident-shard"}[30m]) > 3
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Incident shard restart pressure is above the per-index retry budget.
+            runbook: "Check podFailurePolicy matches before retries delay alert routing."
+        - alert: AirflowIncidentBackfillConcurrencySaturated
+          expr: airflow_dagrun_running{dag_id="model_reliability_control_plane"} >= 2
+          for: 20m
+          labels:
+            severity: warning
+          annotations:
+            summary: Incident backfill max_active_runs is saturated.
+            runbook: "Protect live incident creation and alert routing before increasing recovery concurrency."

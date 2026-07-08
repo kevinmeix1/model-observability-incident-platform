@@ -32,6 +32,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Deadline Alerts", "deadline_alert_plan.json", "Airflow 3 telemetry freshness, incident creation, root-cause, and dashboard publish deadline policies."),
         ("Cost Observability", "cost_observability_report.json", "OpenCost incident-path budgets, telemetry retention cost, GPU diagnostics spend, and allocation labels."),
         ("Elastic Workloads", "elastic_workload_plan.json", "Kueue Workload Slices, JobSet incident fanout, drift-backlog replacement, GPU diagnostics, and rollout-freeze capacity recovery."),
+        ("Indexed Job Resilience", "indexed_job_resilience_plan.json", "Kubernetes Indexed Jobs, per-index retries, success policy, pod failure policy, and bounded Airflow incident backfills."),
         ("Performance Budget", "performance_budget.json", "Detection latency, incident creation, coverage, routing, and dashboard gates."),
         ("Queue Simulation", "queue_simulation.json", "Kueue quota, incident priority, GPU diagnostics, Airflow pool, and preemption simulation."),
         ("Release Admission", "release_admission_decision.json", "Fail-closed rollout freeze record combining incidents, SLOs, queues, governance, and provenance."),

@@ -146,6 +146,8 @@ For Kubernetes v1.36 Workload/PodGroup readiness across incident root-cause fano
 
 For Kubernetes v1.36 user namespaces, `hostUsers: false`, fine-grained kubelet authorization, and `nodes/proxy` regression prevention for observability telemetry, see [runtime security](docs/runtime-security.md).
 
+For Kubernetes v1.36 controller staleness mitigation, `/statusz`, `/flagz`, PSI metrics, and native-histogram readiness for incident automation, see [control plane diagnostics](docs/control-plane-diagnostics.md).
+
 For incident, drift, and retention tenant quotas, Kueue cohorts, Airflow pools, chargeback labels, and noisy-neighbor controls, see [multi-tenant fairness](docs/multi-tenant-fairness.md).
 
 For projected service-account tokens, External Secrets, SPIFFE identities, and keyless observability task access, see [workload identity](docs/workload-identity.md).

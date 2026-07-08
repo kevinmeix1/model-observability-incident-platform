@@ -150,7 +150,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: incident-shard
-          image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0
           command: ["python", "-m", "model_observability_platform", "reliability-plan", "--output", "/workspace"]
           resources:
             requests:
@@ -191,7 +191,7 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: gpu-diagnostic
-          image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0
           command: ["python", "-m", "model_observability_platform", "trace-report", "--output", "/workspace"]
           resources:
             requests:

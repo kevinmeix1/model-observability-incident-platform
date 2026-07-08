@@ -75,7 +75,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: observability-cycle
-              image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+              image: ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0
               command: ["bash", "-lc"]
               args:
                 - "make demo"

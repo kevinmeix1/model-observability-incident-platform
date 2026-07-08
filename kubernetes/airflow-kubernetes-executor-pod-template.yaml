@@ -26,7 +26,7 @@ spec:
             name: model-observability-policy
   containers:
     - name: base
-      image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+      image: ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0
       command: ["bash", "-lc", "make demo"]
       envFrom:
         - configMapRef:

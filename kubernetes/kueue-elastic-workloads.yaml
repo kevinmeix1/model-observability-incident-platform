@@ -41,7 +41,7 @@ spec:
               serviceAccountName: incident-responder
               containers:
                 - name: root-cause-probe
-                  image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+                  image: ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0
                   args:
                     - python
                     - -m
@@ -79,7 +79,7 @@ spec:
       serviceAccountName: drift-evaluator
       containers:
         - name: drift-check
-          image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+          image: ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0
           args:
             - python
             - -m
@@ -123,7 +123,7 @@ spec:
               serviceAccountName: incident-responder
               containers:
                 - name: diagnostic
-                  image: ghcr.io/kevinmeix1/model-observability-incident-platform:latest
+                  image: ghcr.io/kevinmeix1/model-observability-incident-platform:2026.07.0
                   args:
                     - python
                     - -m

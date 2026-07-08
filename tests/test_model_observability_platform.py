@@ -18,6 +18,7 @@ from model_observability_platform.network_security import build_network_security
 from model_observability_platform.orchestration_scorecard import build_orchestration_scorecard
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.performance_budget import build_performance_budget_report
+from model_observability_platform.queue_simulator import build_queue_simulation
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.slo import build_slo_report
@@ -75,6 +76,20 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["ScaledJob", "kafka", "lagThreshold", "limitToPartitionsWithLag", "observability-checks-queue"]:
             self.assertIn(expected, autoscaling)
+
+    def test_queue_simulation_models_incident_priority(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "queue-simulation-policy.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_queue_simulation(root)
+
+            self.assertTrue(report["passed"])
+            self.assertGreaterEqual(report["preempted_count"], 1)
+            self.assertTrue(any(item["name"] == "incident-critical-root-cause" for item in report["simulation"]["admitted"]))
+            self.assertTrue((root / "reports" / "queue_simulation.json").exists())
+            self.assertIn("PriorityClass", manifest)
+            self.assertIn("ObservabilityQueuePressureHigh", manifest)
 
     def test_performance_budget_report_and_prometheus_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -252,7 +267,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "performance_budget.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "queue_simulation.json", "performance_budget.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -320,8 +335,11 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "slo_error_budget.json",
                 "accelerator_capacity_plan.json",
                 "performance_budget.json",
+                "queue_simulation.json",
                 "resource_optimization.json",
                 "network_security.json",
+                "chaos_drill_report.json",
+                "gitops_plan.json",
                 "orchestration_scorecard.json",
                 "supply_chain_evidence.json",
                 "cloud_migration_plan.json",
@@ -359,6 +377,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "index.html").exists())
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "performance_budget.json").exists())
+            self.assertTrue((root / "reports" / "queue_simulation.json").exists())
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
             self.assertTrue((root / "reports" / "supply_chain_evidence.json").exists())
 

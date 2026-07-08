@@ -98,6 +98,8 @@ For GPU ResourceFlavors, Dynamic Resource Allocation notes, MIG/time-slicing tra
 
 For detection latency, incident creation, coverage, alert routing, and dashboard regression gates, see [performance budgets](docs/performance-budgets.md).
 
+For Kueue quota pressure, incident priority, diagnostic preemption, GPU use, and Airflow pool examples, see [queue capacity simulation](docs/queue-capacity-simulation.md).
+
 ## Incident Semantics
 
 Incidents are deduplicated by a stable fingerprint derived from the failed check and observed signature. Running the same report repeatedly does not create duplicates. Each incident includes:

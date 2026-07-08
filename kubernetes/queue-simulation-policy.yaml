@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-queue-simulation
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/name: model-observability
+    app.kubernetes.io/component: queue-simulation
+data:
+  nominal_cpu: "14"
+  nominal_memory_gib: "56"
+  nominal_gpu: "1"
+  airflow_pool_slots: "7"
+  critical_priority_floor: "900"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: observability-incident-critical
+value: 100000
+globalDefault: false
+description: "Incident-critical root cause checks may preempt low-priority observability maintenance."
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-queue-pressure
+  namespace: mlops-observability
+spec:
+  groups:
+    - name: observability.queue-simulation
+      rules:
+        - alert: ObservabilityQueuePressureHigh
+          expr: |
+            sum(kueue_pending_workloads{cluster_queue="observability-checks-cluster-queue"}) > 3
+          for: 10m
+          labels:
+            severity: warning
+            owner: ml-reliability
+          annotations:
+            summary: Observability queue has sustained pending incident or diagnostic work.
+            runbook_url: docs/queue-capacity-simulation.md

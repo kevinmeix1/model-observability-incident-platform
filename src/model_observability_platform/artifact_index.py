@@ -25,8 +25,11 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Cloud Migration Plan", "cloud_migration_plan.json", "Managed cloud observability migration notes for Kubernetes and data platforms."),
         ("Accelerator Plan", "accelerator_capacity_plan.json", "GPU, DRA, Kueue, MIG, and time-slicing plan for monitor workloads."),
         ("Performance Budget", "performance_budget.json", "Detection latency, incident creation, coverage, routing, and dashboard gates."),
+        ("Queue Simulation", "queue_simulation.json", "Kueue quota, incident priority, GPU diagnostics, Airflow pool, and preemption simulation."),
         ("Resource Optimization", "resource_optimization.json", "Requests, limits, HPA, VPA, KEDA, and capacity guidance for reliability checks."),
         ("Network Security", "network_security.json", "mTLS, network policy, and telemetry-to-incident access topology for the platform."),
+        ("Chaos Drill", "chaos_drill_report.json", "Observability failure-injection scenarios with blast radius and recovery objectives."),
+        ("GitOps Plan", "gitops_plan.json", "Promotion waves, incident gates, rollback commands, and GitOps-controlled reliability rollout."),
         ("Orchestration Scorecard", "orchestration_scorecard.json", "Automated scan of advanced Airflow, Kubernetes, lineage, and security controls."),
     ]
     card_html = "\n".join(

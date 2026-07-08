@@ -1,0 +1,119 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Topology
+metadata:
+  name: observability-accelerator-topology
+spec:
+  levels:
+    - nodeLabel: cloud.provider.com/topology-block
+    - nodeLabel: cloud.provider.com/topology-rack
+    - nodeLabel: kubernetes.io/hostname
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: gpu-l4-observability-tas
+spec:
+  nodeLabels:
+    accelerator: nvidia-l4
+  topologyName: observability-accelerator-topology
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: AdmissionCheck
+metadata:
+  name: observability-topology-provisioning-check
+spec:
+  controllerName: kueue.x-k8s.io/provisioning-request
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: observability-topology-aware-queue
+spec:
+  namespaceSelector: {}
+  admissionChecks:
+    - observability-topology-provisioning-check
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: gpu-l4-observability-tas
+          resources:
+            - name: nvidia.com/gpu
+              nominalQuota: 2
+            - name: cpu
+              nominalQuota: 24
+            - name: memory
+              nominalQuota: 96Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-collector-ha
+  namespace: mlops-observability
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: telemetry-collector
+  template:
+    metadata:
+      labels:
+        app: telemetry-collector
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: telemetry-collector
+      containers:
+        - name: collector
+          image: ghcr.io/kevinmeix1/model-observability@sha256:replace-with-digest
+          args: ["python", "-m", "model_observability_platform", "demo", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 512Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: embedding-drift-topology-diagnostic
+  namespace: mlops-observability
+  annotations:
+    kueue.x-k8s.io/queue-name: drift-monitoring-queue
+    kueue.x-k8s.io/podset-preferred-topology: cloud.provider.com/topology-rack
+spec:
+  completions: 4
+  parallelism: 4
+  completionMode: Indexed
+  template:
+    spec:
+      serviceAccountName: drift-evaluator
+      restartPolicy: Never
+      containers:
+        - name: drift-diagnostic
+          image: ghcr.io/kevinmeix1/model-observability@sha256:replace-with-digest
+          args: ["python", "-m", "model_observability_platform", "reliability-plan", "--output", "/workspace"]
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+              nvidia.com/gpu: "1"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-topology-aware-scheduling
+  namespace: mlops-observability
+spec:
+  groups:
+    - name: observability.topology.scheduling
+      rules:
+        - alert: ObservabilityTopologyAssignmentDelayed
+          expr: kueue_pending_workloads{cluster_queue="observability-topology-aware-queue"} > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Topology-aware drift diagnostics are pending; keep CPU incident routing active."

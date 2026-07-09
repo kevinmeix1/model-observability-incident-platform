@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-hpa-scale-to-zero-feature-gate
+  namespace: mlops-observability
+  labels:
+    platform.mlops.dev/control: hpa-scale-to-zero
+data:
+  feature-gate: HPAScaleToZero
+  status: "Kubernetes v1.36 alpha; disabled by default"
+  requirement: "minReplicas: 0 requires autoscaling/v2 plus Object or External metrics"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: drift-diagnostic-worker-scale-to-zero
+  namespace: mlops-observability
+  annotations:
+    platform.mlops.dev/feature-gate: HPAScaleToZero
+    platform.mlops.dev/cold-start-budget-seconds: "90"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: drift-diagnostic-worker
+  minReplicas: 0
+  maxReplicas: 24
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: observability_drift_queue_depth
+          selector:
+            matchLabels:
+              queue: drift-diagnostics
+        target:
+          type: Value
+          value: "1"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 500
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: incident-evidence-renderer-scale-to-zero
+  namespace: mlops-observability
+  annotations:
+    platform.mlops.dev/feature-gate: HPAScaleToZero
+    platform.mlops.dev/cold-start-budget-seconds: "90"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: incident-evidence-renderer
+  minReplicas: 0
+  maxReplicas: 12
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: incident_evidence_render_queue_depth
+          selector:
+            matchLabels:
+              queue: incident-evidence
+        target:
+          type: Value
+          value: "1"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      stabilizationWindowSeconds: 600
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: retention-replay-worker-scale-to-zero
+  namespace: mlops-observability
+  annotations:
+    platform.mlops.dev/feature-gate: HPAScaleToZero
+    platform.mlops.dev/cold-start-budget-seconds: "120"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: retention-replay-worker
+  minReplicas: 0
+  maxReplicas: 8
+  metrics:
+    - type: Object
+      object:
+        describedObject:
+          apiVersion: v1
+          kind: Service
+          name: retention-replay-queue
+        metric:
+          name: retention_replay_backlog
+        target:
+          type: Value
+          value: "1"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      stabilizationWindowSeconds: 900
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-hpa-scale-to-zero
+  namespace: mlops-observability
+spec:
+  groups:
+    - name: observability.hpa-scale-to-zero
+      rules:
+        - alert: ObservabilityScaleToZeroWakeupFailed
+          expr: max(observability_drift_queue_depth) > 0 and max(kube_horizontalpodautoscaler_status_desired_replicas{namespace="mlops-observability", horizontalpodautoscaler=~".*scale-to-zero"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Observability worker did not wake from scale-to-zero after backlog arrived
+        - alert: ObservabilityScaleToZeroMetricMissing
+          expr: absent(observability_drift_queue_depth) or absent(incident_evidence_render_queue_depth)
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: External metric required for HPAScaleToZero is missing
+        - alert: ObservabilityScaleToZeroColdStartBudgetExceeded
+          expr: max(observability_worker_cold_start_seconds{namespace="mlops-observability"}) > 120
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Observability worker exceeded the scale-to-zero cold-start budget

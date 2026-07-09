@@ -25,6 +25,7 @@ from .event_driven_assets import build_event_driven_assets_plan
 from .flavor_fungibility import build_flavor_fungibility_plan
 from .gitops_release import build_gitops_plan
 from .governance import build_governance_bundle
+from .hpa_scale_to_zero import build_hpa_scale_to_zero_plan
 from .identity import build_identity_access_report
 from .incident_evidence_volume import build_incident_evidence_volume_plan
 from .incidents import create_incidents
@@ -113,6 +114,7 @@ def demo(output: str | Path) -> dict:
     runtime_security = build_runtime_security_plan(root)
     control_plane_diagnostics = build_control_plane_diagnostics_plan(root)
     memory_qos = build_memory_qos_plan(root)
+    hpa_scale_to_zero = build_hpa_scale_to_zero_plan(root)
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
@@ -180,6 +182,7 @@ def demo(output: str | Path) -> dict:
         "runtime_security": runtime_security,
         "control_plane_diagnostics": control_plane_diagnostics,
         "memory_qos": memory_qos,
+        "hpa_scale_to_zero": hpa_scale_to_zero,
         "incident_evidence_volume": incident_evidence_volume,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
@@ -259,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
         "runtime-security",
         "control-plane-diagnostics",
         "memory-qos",
+        "hpa-scale-zero",
         "incident-evidence-volumes",
         "release-admission",
     ]:
@@ -357,6 +361,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_control_plane_diagnostics_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "memory-qos":
         print(json.dumps(build_memory_qos_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "hpa-scale-zero":
+        print(json.dumps(build_hpa_scale_to_zero_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "incident-evidence-volumes":
         print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":

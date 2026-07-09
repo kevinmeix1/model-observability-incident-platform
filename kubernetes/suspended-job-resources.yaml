@@ -1,0 +1,94 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: incident-root-cause-job
+  namespace: mlops-observability
+  annotations:
+    platform.mlops.dev/feature-gate: MutablePodResourcesForSuspendedJobs
+    platform.mlops.dev/resource-mutation-reason: incident-priority-quota-fit
+spec:
+  suspend: true
+  completionMode: Indexed
+  completions: 6
+  parallelism: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: root-cause
+          image: ghcr.io/kevinmeix1/model-observability-root-cause:2026.07
+          resources:
+            requests:
+              cpu: "4"
+              memory: 10Gi
+            limits:
+              cpu: "6"
+              memory: 12Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: drift-diagnostic-job
+  namespace: mlops-observability
+  annotations:
+    platform.mlops.dev/feature-gate: MutablePodResourcesForSuspendedJobs
+    platform.mlops.dev/resource-mutation-reason: drift-window-gpu-quota-fit
+spec:
+  suspend: true
+  completionMode: Indexed
+  completions: 4
+  parallelism: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: drift-diagnostics
+          image: ghcr.io/kevinmeix1/model-observability-drift-diagnostics:2026.07
+          resources:
+            requests:
+              cpu: "5"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: 24Gi
+              nvidia.com/gpu: "1"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: observability-suspended-job-resource-mutation-guard
+spec:
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["jobs"]
+  validations:
+    - expression: "!(has(oldObject) && oldObject.spec.template.spec.containers[0].resources != object.spec.template.spec.containers[0].resources && object.spec.suspend != true)"
+      message: "MutablePodResourcesForSuspendedJobs allows resource mutation only while spec.suspend is true"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-suspended-job-resources
+  namespace: mlops-observability
+spec:
+  groups:
+    - name: observability.suspended-job-resources
+      rules:
+        - alert: ObservabilitySuspendedJobResizeStale
+          expr: max(observability_suspended_job_resource_patch_age_seconds{namespace="mlops-observability"}) > 900
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Suspended incident diagnostic Job resource mutation has not been unsuspended or reverted
+        - alert: ObservabilitySuspendedJobUnsuspendWithoutQuotaFit
+          expr: max(observability_suspended_job_unsuspend_without_quota_fit{namespace="mlops-observability"}) > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: Incident diagnostic Job was unsuspended before quota and evidence fit was recorded

@@ -152,6 +152,8 @@ For Kubernetes v1.36 Memory QoS tiered protection, `memoryReservationPolicy: Tie
 
 For Kubernetes v1.36 HPA scale-to-zero, `HPAScaleToZero`, Object/External wake metrics, and cold-start budgets for diagnostic workers, see [HPA scale to zero](docs/hpa-scale-to-zero.md).
 
+For Kubernetes v1.36 suspended Job resource mutation, `MutablePodResourcesForSuspendedJobs`, and queue-time CPU/memory/GPU right-sizing for incident root-cause, drift diagnostic, and retention replay Jobs before unsuspend, see [suspended Job resources](docs/suspended-job-resources.md).
+
 For incident, drift, and retention tenant quotas, Kueue cohorts, Airflow pools, chargeback labels, and noisy-neighbor controls, see [multi-tenant fairness](docs/multi-tenant-fairness.md).
 
 For projected service-account tokens, External Secrets, SPIFFE identities, and keyless observability task access, see [workload identity](docs/workload-identity.md).

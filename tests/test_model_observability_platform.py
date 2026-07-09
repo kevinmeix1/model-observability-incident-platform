@@ -52,6 +52,7 @@ from model_observability_platform.runtime_security import build_runtime_security
 from model_observability_platform.semantic_telemetry import build_semantic_telemetry_plan
 from model_observability_platform.slo import build_slo_report
 from model_observability_platform.supply_chain import build_supply_chain_evidence
+from model_observability_platform.suspended_job_resources import build_suspended_job_resource_plan
 from model_observability_platform.tenancy import build_tenancy_report
 from model_observability_platform.telemetry import generate_window
 from model_observability_platform.topology_placement import build_topology_placement_plan
@@ -337,7 +338,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
         for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -916,6 +917,25 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["HorizontalPodAutoscaler", "autoscaling/v2", "type: Object", "ObservabilityScaleToZeroWakeupFailed", "ObservabilityScaleToZeroColdStartBudgetExceeded"]:
             self.assertIn(expected, manifest)
 
+    def test_suspended_job_resource_plan_and_kubernetes_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        docs = (repo / "docs" / "suspended-job-resources.md").read_text(encoding="utf-8")
+        manifest = (repo / "kubernetes" / "suspended-job-resources.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = build_suspended_job_resource_plan(root)
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["recommended_action"], "enable_suspended_job_resource_mutation_for_incident_diagnostics")
+            self.assertEqual(report["feature"]["name"], "MutablePodResourcesForSuspendedJobs")
+            self.assertTrue(all(item["suspended"] for item in report["resource_mutations"]))
+            self.assertTrue(all(not item["suspended"] for item in report["protected_jobs"]))
+            self.assertTrue((root / "reports" / "suspended_job_resources_plan.json").exists())
+        for expected in ["Suspended Job Resource Mutation", "MutablePodResourcesForSuspendedJobs", "spec.suspend", "CPU", "GPU", "incident"]:
+            self.assertIn(expected, docs + manifest)
+        for expected in ["ValidatingAdmissionPolicy", "suspend: true", "ObservabilitySuspendedJobResizeStale", "ObservabilitySuspendedJobUnsuspendWithoutQuotaFit"]:
+            self.assertIn(expected, manifest)
+
     def test_identity_access_report_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         manifest = (repo / "kubernetes" / "workload-identity.yaml").read_text(encoding="utf-8")
@@ -966,6 +986,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("control_plane_freshness_diagnostics", names)
             self.assertIn("memory_qos_tiered_protection", names)
             self.assertIn("hpa_scale_to_zero_external_metrics", names)
+            self.assertIn("suspended_job_resource_mutation", names)
             self.assertIn("supply_chain_provenance", names)
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
 
@@ -1038,6 +1059,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "control_plane_diagnostics_plan.json",
                 "memory_qos_plan.json",
                 "hpa_scale_to_zero_plan.json",
+                "suspended_job_resources_plan.json",
                 "release_admission_decision.json",
                 "resource_optimization.json",
                 "network_security.json",
@@ -1111,6 +1133,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "control_plane_diagnostics_plan.json").exists())
             self.assertTrue((root / "reports" / "memory_qos_plan.json").exists())
             self.assertTrue((root / "reports" / "hpa_scale_to_zero_plan.json").exists())
+            self.assertTrue((root / "reports" / "suspended_job_resources_plan.json").exists())
             self.assertTrue((root / "reports" / "release_admission_decision.json").exists())
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
             self.assertTrue((root / "reports" / "supply_chain_evidence.json").exists())

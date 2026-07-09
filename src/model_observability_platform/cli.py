@@ -33,6 +33,7 @@ from .inplace_resize import build_inplace_resize_plan
 from .inference_gateway import build_inference_gateway_plan
 from .io import read_csv, write_json
 from .kuberay_capacity import build_kuberay_capacity_plan
+from .memory_qos import build_memory_qos_plan
 from .multi_team_readiness import build_multi_team_readiness_plan
 from .multikueue_dispatch import build_multikueue_dispatch_plan
 from .network_security import build_network_security_report
@@ -111,6 +112,7 @@ def demo(output: str | Path) -> dict:
     workload_aware_scheduling = build_workload_aware_scheduling_plan(root)
     runtime_security = build_runtime_security_plan(root)
     control_plane_diagnostics = build_control_plane_diagnostics_plan(root)
+    memory_qos = build_memory_qos_plan(root)
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
@@ -177,6 +179,7 @@ def demo(output: str | Path) -> dict:
         "workload_aware_scheduling": workload_aware_scheduling,
         "runtime_security": runtime_security,
         "control_plane_diagnostics": control_plane_diagnostics,
+        "memory_qos": memory_qos,
         "incident_evidence_volume": incident_evidence_volume,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
@@ -255,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         "workload-aware-scheduling",
         "runtime-security",
         "control-plane-diagnostics",
+        "memory-qos",
         "incident-evidence-volumes",
         "release-admission",
     ]:
@@ -351,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_runtime_security_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "control-plane-diagnostics":
         print(json.dumps(build_control_plane_diagnostics_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "memory-qos":
+        print(json.dumps(build_memory_qos_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "incident-evidence-volumes":
         print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":

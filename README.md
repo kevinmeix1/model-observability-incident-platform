@@ -191,11 +191,15 @@ facets, rollout feature-flag context, confidence, and missing evidence to
 
 ### Alert routing and guarded remediation
 
-The alert routing plan models Alertmanager grouping, inhibition, escalation, and receiver routing before the transactional outbox sees an incident event. It also classifies remediation actions by blast radius: rollout freezes and diagnostic fanout are automatic, while resource-increasing diagnostic scaling requires human approval. See [alert routing and guarded remediation](docs/alert-routing-remediation.md).
+The alert routing plan models Alertmanager grouping, inhibition, escalation, and receiver routing before the transactional outbox sees an incident event. It also classifies remediation actions by blast radius: rollout freezes and diagnostic fanout are automatic, while resource-increasing diagnostic scaling requires human approval. The dashboard includes an interactive triage lab so a reviewer can choose an alert group, see which symptoms are suppressed, inspect receiver timing, and trace the OpenLineage column-impact path before accepting the remediation. See [alert routing and guarded remediation](docs/alert-routing-remediation.md).
 
 ![Alert routing and remediation dashboard panel](docs/screenshots/dashboard-alert-routing-remediation.png)
 
 Mobile capture: [dashboard-alert-routing-remediation-mobile.png](docs/screenshots/dashboard-alert-routing-remediation-mobile.png)
+
+![Alert routing triage lab](docs/screenshots/dashboard-alert-routing-triage.png)
+
+Mobile triage capture: [dashboard-alert-routing-triage-mobile.png](docs/screenshots/dashboard-alert-routing-triage-mobile.png)
 
 ### Transactional notifications
 

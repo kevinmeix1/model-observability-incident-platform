@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import json
 from pathlib import Path
 
 
@@ -148,6 +149,7 @@ def render_dashboard(
         }
         for item in rca_evidence[:6]
     ]
+    alert_routing_json = json.dumps(alert_routing, sort_keys=True).replace("</", "<\\/")
     body = f"""
     <!doctype html>
     <html lang="en">
@@ -246,8 +248,26 @@ def render_dashboard(
         .live-incident {{ display:grid; grid-template-columns:minmax(0,1.3fr) 74px 84px auto; gap:8px; align-items:center; padding:7px 8px; border-top:1px solid #e8edf3; font-size:11px; }}
         .live-incident strong {{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
         .mini-action {{ border:1px solid #cbd5e1; border-radius:5px; padding:5px 7px; background:white; color:#334155; font:inherit; font-size:10px; font-weight:800; cursor:pointer; }}
-        @media (max-width:900px) {{ header {{ padding:22px 18px; }} main {{ padding:18px; }} .layout,.lower-grid,.response-grid {{ grid-template-columns:1fr; }} .facts {{ grid-template-columns:1fr; }} }}
-        @media (max-width:620px) {{ .lab-heading {{ flex-direction:column; }} .api-status {{ width:100%; }} .control-row {{ grid-template-columns:106px minmax(0,1fr) 64px; }} .lab-kpis {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} .lab-kpis div:nth-child(2) {{ border-right:0; }} .lab-kpis div:nth-child(-n+2) {{ border-bottom:1px solid #e4e9f0; }} .event-rail {{ grid-template-columns:1fr; }} .event-step {{ border-right:0; }} .live-incident {{ grid-template-columns:minmax(0,1fr) 70px 72px; }} .live-incident .mini-action {{ grid-column:1 / -1; }} .table-wrap table {{ min-width:0; }} th,td {{ padding:8px 7px; font-size:11px; }} .checks col:nth-child(1),.incidents col:nth-child(2) {{ width:24%; }} .checks col:nth-child(2),.checks col:nth-child(3),.incidents col:nth-child(3),.incidents col:nth-child(5) {{ width:15%; }} .checks col:nth-child(4),.incidents col:nth-child(4) {{ width:31%; }} .checks col:nth-child(5),.incidents col:nth-child(1) {{ width:15%; }} }}
+        .routing-lab {{ border-left:4px solid #0f766e; margin:0 0 18px; }}
+        .routing-grid {{ display:grid; grid-template-columns:minmax(320px,.55fr) minmax(0,1.45fr); gap:18px; align-items:start; }}
+        .route-select {{ width:100%; min-height:38px; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; background:white; color:#172026; font:inherit; font-size:13px; font-weight:800; }}
+        .route-summary {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }}
+        .route-fact {{ min-height:66px; padding:11px; border:1px solid #e4e9f0; border-radius:6px; background:#f8fafc; }}
+        .route-fact span {{ display:block; color:#64748b; font-size:11px; margin-bottom:7px; }}
+        .route-fact strong {{ display:block; font-size:15px; overflow-wrap:anywhere; }}
+        .route-flow {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }}
+        .route-step {{ min-height:94px; padding:11px; border:1px solid #dbe3ec; border-radius:6px; background:#ffffff; }}
+        .route-step span {{ display:block; color:#64748b; font-size:10px; font-weight:800; text-transform:uppercase; margin-bottom:7px; }}
+        .route-step strong {{ display:block; color:#0f172a; font-size:13px; line-height:1.3; overflow-wrap:anywhere; }}
+        .route-step small {{ display:block; margin-top:7px; color:#64748b; font-size:11px; line-height:1.35; }}
+        .blast-panel {{ display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:10px; margin-top:10px; }}
+        .blast-list {{ display:grid; gap:7px; }}
+        .blast-item {{ padding:9px 10px; border:1px solid #e4e9f0; border-radius:6px; background:#f8fafc; }}
+        .blast-item strong {{ display:block; font-size:12px; overflow-wrap:anywhere; }}
+        .blast-item span {{ display:block; margin-top:5px; color:#64748b; font-size:11px; line-height:1.35; }}
+        .route-note {{ margin:10px 0 0; color:#64748b; font-size:12px; line-height:1.45; }}
+        @media (max-width:900px) {{ header {{ padding:22px 18px; }} main {{ padding:18px; }} .layout,.lower-grid,.response-grid,.routing-grid,.blast-panel {{ grid-template-columns:1fr; }} .facts {{ grid-template-columns:1fr; }} }}
+        @media (max-width:620px) {{ .lab-heading {{ flex-direction:column; }} .api-status {{ width:100%; }} .control-row {{ grid-template-columns:106px minmax(0,1fr) 64px; }} .lab-kpis,.route-summary {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} .lab-kpis div:nth-child(2) {{ border-right:0; }} .lab-kpis div:nth-child(-n+2) {{ border-bottom:1px solid #e4e9f0; }} .event-rail,.route-flow {{ grid-template-columns:1fr; }} .event-step {{ border-right:0; }} .live-incident {{ grid-template-columns:minmax(0,1fr) 70px 72px; }} .live-incident .mini-action {{ grid-column:1 / -1; }} .table-wrap table {{ min-width:0; }} th,td {{ padding:8px 7px; font-size:11px; }} .checks col:nth-child(1),.incidents col:nth-child(2) {{ width:24%; }} .checks col:nth-child(2),.checks col:nth-child(3),.incidents col:nth-child(3),.incidents col:nth-child(5) {{ width:15%; }} .checks col:nth-child(4),.incidents col:nth-child(4) {{ width:31%; }} .checks col:nth-child(5),.incidents col:nth-child(1) {{ width:15%; }} }}
       </style>
     </head>
     <body>
@@ -296,6 +316,43 @@ def render_dashboard(
                 <div class="event-step" data-live-stage="worker"><span>Worker</span><strong>Receipts</strong></div>
               </div>
               <div id="liveIncidents" class="live-incidents"><div class="live-incident"><strong>No live incidents</strong></div></div>
+            </div>
+          </div>
+        </section>
+        <section class="panel routing-lab" data-testid="alert-routing-triage-lab">
+          <div class="lab-heading">
+            <div><h2>Alert Routing Triage Lab</h2><p>Inspect how Alertmanager-style grouping, inhibition, lineage impact, and guarded remediation turn noisy monitor failures into one controlled operator action.</p></div>
+            <div class="api-status live">STATIC EVIDENCE</div>
+          </div>
+          <div class="routing-grid">
+            <div>
+              <label class="toggle-row" for="routeScenario"><span>Incident group</span></label>
+              <select id="routeScenario" class="route-select" aria-label="Alert routing scenario"></select>
+              <div class="route-summary">
+                <div class="route-fact"><span>Receiver</span><strong id="routeReceiver">n/a</strong></div>
+                <div class="route-fact"><span>Noise reduced</span><strong id="routeNoise">n/a</strong></div>
+                <div class="route-fact"><span>Repeat interval</span><strong id="routeRepeat">n/a</strong></div>
+                <div class="route-fact"><span>Human approval</span><strong id="routeApproval">n/a</strong></div>
+              </div>
+              <p id="routeNarrative" class="route-note">Select a grouped alert to view the action path.</p>
+            </div>
+            <div>
+              <div class="route-flow" aria-label="Alert routing path">
+                <div class="route-step"><span>Group</span><strong id="routeGroup">n/a</strong><small id="routeRoot">n/a</small></div>
+                <div class="route-step"><span>Inhibit</span><strong id="routeInhibit">n/a</strong><small>Suppress lower-severity symptoms with the same root cause.</small></div>
+                <div class="route-step"><span>Remediate</span><strong id="routeAction">n/a</strong><small id="routeBlast">n/a</small></div>
+                <div class="route-step"><span>Lineage</span><strong id="routeLineage">n/a</strong><small id="routeAssets">n/a</small></div>
+              </div>
+              <div class="blast-panel">
+                <div>
+                  <h2>Guarded Actions</h2>
+                  <div id="remediationList" class="blast-list"></div>
+                </div>
+                <div>
+                  <h2>Impacted Critical Paths</h2>
+                  <div id="criticalPathList" class="blast-list"></div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -388,10 +445,76 @@ def render_dashboard(
       </main>
       <script>
         const labById = (id) => document.getElementById(id);
+        const alertRoutingEvidence = {alert_routing_json};
         const modelVersion = "risk-model-2026-07-15";
         let labSequence = 0;
         let lastEvaluation = null;
         let liveRefreshTimer = null;
+
+        function formatRouteText(value) {{
+          return String(value || "n/a").replaceAll("_", " ");
+        }}
+
+        function remediationFor(group) {{
+          const remediations = alertRoutingEvidence.remediations || [];
+          return remediations.find((item) => item.alert === group.top_alert) || remediations.find((item) => String(item.action || "").includes(String(group.root_cause || ""))) || remediations[0] || {{}};
+        }}
+
+        function renderRoutingLab() {{
+          const groups = (alertRoutingEvidence.alertmanager && alertRoutingEvidence.alertmanager.groups) || [];
+          const select = labById("routeScenario");
+          if (!groups.length) return;
+          if (!select.options.length) {{
+            groups.forEach((group, index) => {{
+              const option = document.createElement("option");
+              option.value = String(index);
+              option.textContent = group.group_key + " -> " + group.receiver;
+              select.appendChild(option);
+            }});
+          }}
+          const group = groups[Number(select.value || 0)] || groups[0];
+          const remediation = remediationFor(group);
+          const inhibited = (alertRoutingEvidence.alertmanager.inhibited_alerts || []).filter((item) => item.inhibited_by === group.top_alert);
+          const lineage = alertRoutingEvidence.lineage_impact || {{}};
+          labById("routeReceiver").textContent = group.receiver || "n/a";
+          labById("routeNoise").textContent = String(group.suppressed_count || inhibited.length || 0) + " suppressed";
+          labById("routeRepeat").textContent = group.repeat_interval || "n/a";
+          labById("routeApproval").textContent = remediation.requires_human ? "Required" : "Automated";
+          labById("routeGroup").textContent = group.top_alert || "n/a";
+          labById("routeRoot").textContent = formatRouteText(group.root_cause) + " / " + String(group.alert_count || 0) + " alerts";
+          labById("routeInhibit").textContent = inhibited.length ? inhibited.map((item) => item.alert).join(", ") : "No suppressed symptoms";
+          labById("routeAction").textContent = formatRouteText(remediation.action);
+          labById("routeBlast").textContent = remediation.blast_radius || "blast radius pending";
+          labById("routeLineage").textContent = lineage.facet || "lineage pending";
+          labById("routeAssets").textContent = (lineage.impacted_assets || []).map(formatRouteText).join(", ") || "no downstream assets";
+          labById("routeNarrative").textContent = group.severity + " " + formatRouteText(group.root_cause) + " routes to " + group.receiver + " with " + formatRouteText(remediation.mode) + " remediation.";
+
+          const remediationList = labById("remediationList");
+          remediationList.replaceChildren();
+          (alertRoutingEvidence.remediations || []).forEach((item) => {{
+            const row = document.createElement("div");
+            row.className = "blast-item";
+            const title = document.createElement("strong");
+            title.textContent = formatRouteText(item.action) + (item.requires_human ? " (approval)" : " (auto)");
+            const detail = document.createElement("span");
+            detail.textContent = item.target + " / " + item.blast_radius;
+            row.append(title, detail);
+            remediationList.appendChild(row);
+          }});
+
+          const pathList = labById("criticalPathList");
+          pathList.replaceChildren();
+          (lineage.critical_paths || []).forEach((path) => {{
+            const row = document.createElement("div");
+            row.className = "blast-item";
+            const title = document.createElement("strong");
+            title.textContent = path;
+            const detail = document.createElement("span");
+            detail.textContent = "OpenLineage column impact path";
+            row.append(title, detail);
+            pathList.appendChild(row);
+          }});
+        }}
 
         function clamp(value, low, high) {{
           return Math.min(Math.max(value, low), high);
@@ -610,8 +733,10 @@ def render_dashboard(
         }}
 
         ["populationShift", "scenarioLatency", "scenarioErrors", "freshWindow"].forEach((id) => labById(id).addEventListener("input", renderControlValues));
+        labById("routeScenario").addEventListener("change", renderRoutingLab);
         labById("runIncidentScenario").addEventListener("click", runScenario);
         labById("runRecovery").addEventListener("click", runRecovery);
+        renderRoutingLab();
         renderControlValues();
         refreshLiveState();
         liveRefreshTimer = window.setInterval(refreshLiveState, 2500);

@@ -1155,9 +1155,15 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             dashboard = dashboard_path.read_text(encoding="utf-8")
             self.assertIn("Live Incident Response Lab", dashboard)
             self.assertIn('data-testid="incident-response-lab"', dashboard)
+            self.assertIn("Alert Routing Triage Lab", dashboard)
+            self.assertIn('data-testid="alert-routing-triage-lab"', dashboard)
             self.assertIn("Root Cause Evidence", dashboard)
-            self.assertIn("incidentRootCauseFacet", (root / "reports" / "root_cause_evidence_bundle.json").read_text(encoding="utf-8"))
+            root_cause_bundle = (root / "reports" / "root_cause_evidence_bundle.json").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("incidentRootCauseFacet", root_cause_bundle)
             self.assertIn("function buildEvaluation", dashboard)
+            self.assertIn("function renderRoutingLab", dashboard)
             self.assertIn('apiJson("/v1/evaluations"', dashboard)
             self.assertTrue(result["root_cause_evidence"]["passed"])
             self.assertTrue((root / "reports" / "index.html").exists())
@@ -1284,6 +1290,9 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(plan["lineage_impact"]["facet"], "columnLineage")
             self.assertTrue((root / "reports" / "alert_routing_remediation_plan.json").exists())
             self.assertIn("Alert Routing And Remediation", dashboard)
+            self.assertIn("Alert Routing Triage Lab", dashboard)
+            self.assertIn("routeScenario", dashboard)
+            self.assertIn("OpenLineage column impact path", dashboard)
             self.assertIn("alert_routing_remediation_plan.json", index)
         for expected in [
             "AlertmanagerConfig",

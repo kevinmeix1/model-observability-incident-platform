@@ -130,6 +130,8 @@ For Airflow 3 GitDagBundle configuration, DAG versioning, scheduler-managed back
 
 For Airflow 3.2 asset partitioning across telemetry windows, incident root-cause fanout, evidence bundles, and rollout-freeze backfills, see [Airflow asset partitioning](docs/airflow-asset-partitioning.md).
 
+For Airflow 3.3 task/asset state stores, bounded incident rollup and diagnostic fanout, runtime partitions, exception-aware retries, and a real SDK parse gate, see [Airflow stateful orchestration](docs/airflow-stateful-orchestration.md).
+
 For Airflow multi-team preview readiness with observability-owned DAG Bundles, team-scoped pools/secrets, team triggerers, and asset-event filtering, see [Airflow multi-team readiness](docs/airflow-multi-team-readiness.md).
 
 For Gateway API Inference Extension monitoring, observed `InferencePool` health, Endpoint Picker incident signals, and canary-freeze fallbacks, see [Gateway API Inference Extension](docs/inference-gateway.md).

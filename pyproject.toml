@@ -11,3 +11,4 @@ integrations = [
   "opentelemetry-api>=1.25",
   "fastapi>=0.111"
 ]
+airflow33 = ["apache-airflow==3.3.0"]

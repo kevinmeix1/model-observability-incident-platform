@@ -7,6 +7,7 @@ from pathlib import Path
 from model_observability_platform.accelerator_plan import build_accelerator_capacity_plan
 from model_observability_platform.admin_access_diagnostics import build_admin_access_diagnostic_plan
 from model_observability_platform.advanced_device_sharing import build_advanced_device_sharing_plan
+from model_observability_platform.airflow_stateful_orchestration import build_airflow_stateful_orchestration_plan
 from model_observability_platform.asset_partitioning import build_asset_partitioning_plan
 from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
@@ -691,6 +692,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["CronPartitionTimetable", "PartitionedAssetTimetable", "StartOfHourMapper", "dag_run.partition_key", "partitioned_rollout_freeze_gate"]:
             self.assertIn(expected, dag)
 
+    def test_airflow33_stateful_orchestration_contract(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        dag = (repo / "airflow" / "dags" / "airflow33_stateful_incident_dag.py").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "airflow-stateful-orchestration.md").read_text(encoding="utf-8")
+        ci = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        validator = (repo / "tools" / "validate_airflow33_dag.py").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            report = build_airflow_stateful_orchestration_plan(tmp, repo_root=repo)
+
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["recommended_action"], "adopt_airflow_33_stateful_incident_contract")
+        self.assertIn("real_airflow_parse_gate", {check["name"] for check in report["checks"] if check["passed"]})
+        for expected in ["task_state_store", "asset_state_store", "NEVER_EXPIRE", "ExceptionRetryPolicy", "RollupMapper", "FanOutMapper", "PartitionedAtRuntime"]:
+            self.assertIn(expected, dag)
+        self.assertIn("dag.validate()", validator)
+        self.assertIn("apache-airflow==3.3.0", ci)
+        self.assertIn("Production Boundary", docs)
+
     def test_multi_team_readiness_plan_and_airflow_config_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         docs = (repo / "docs" / "airflow-multi-team-readiness.md").read_text(encoding="utf-8")
@@ -990,6 +1009,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("incident_image_volume_evidence", names)
             self.assertIn("airflow_dag_bundle_versioning", names)
             self.assertIn("airflow_asset_partitioning", names)
+            self.assertIn("airflow_stateful_orchestration", names)
             self.assertIn("airflow_multi_team_readiness", names)
             self.assertIn("airflow_event_driven_assets", names)
             self.assertIn("pod_resource_envelopes", names)
@@ -1139,6 +1159,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "incident_evidence_volume_plan.json").exists())
             self.assertTrue((root / "reports" / "dag_bundle_versioning_plan.json").exists())
             self.assertTrue((root / "reports" / "asset_partitioning_plan.json").exists())
+            self.assertTrue((root / "reports" / "airflow_stateful_orchestration_plan.json").exists())
             self.assertTrue((root / "reports" / "multi_team_readiness_plan.json").exists())
             self.assertTrue((root / "reports" / "event_driven_assets_plan.json").exists())
             self.assertTrue((root / "reports" / "pod_resource_envelope_plan.json").exists())

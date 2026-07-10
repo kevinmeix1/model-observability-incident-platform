@@ -137,23 +137,28 @@ jobs:
       - name: Install exact runtime and verification dependencies
         run: |
           python -m pip install --upgrade "pip==25.3"
-          python -m pip install --constraint requirements-observability.lock -e ".[runtime]" "httpx2==2.5.0" "ruff==0.15.21"
+          python -m pip install --constraint requirements-observability.lock "build==1.5.1" "setuptools==83.0.0" "wheel==0.47.0"
+          python -m pip install --no-build-isolation --constraint requirements-observability.lock --editable ".[runtime,test,dev]"
       - name: Verify dependency consistency
-        run: python -m pip check
+        run: |
+          python -m pip check
+          make verify-observability-lock PYTHON=python
       - name: Lint the executable runtime boundary
         run: make lint-runtime PYTHON=python
       - name: Run API and lifecycle contracts
         run: make test-api PYTHON=python
       - name: Exercise the in-process HTTP contract
         run: make runtime-contract PYTHON=python
+      - name: Exercise transactional notification recovery
+        run: make notification-outbox-contract PYTHON=python
       - name: Validate runtime initialization
         run: make runtime-init PYTHON=python
       - name: Validate Compose model
         run: make compose-config
       - name: Exercise the containerized HTTP contract
         run: make compose-smoke PYTHON=python
-      - name: Build wheel without resolving new dependencies
-        run: python -m pip wheel --no-deps --wheel-dir dist .
+      - name: Build and smoke-test the isolated wheel
+        run: make package package-smoke PYTHON=python
       - name: Publish runtime evidence summary
         if: always()
         run: |
@@ -162,6 +167,7 @@ jobs:
             echo ""
             echo "- FastAPI telemetry evaluation and incident lifecycle API"
             echo "- SQLite WAL transaction and restart-safe idempotency contract"
+            echo "- Transactional CloudEvents outbox with lease recovery, retry, ordering, and DLQ"
             echo "- Prometheus low-cardinality metric contract"
             echo "- OpenTelemetry W3C trace propagation contract"
             echo "- Non-root, read-only Compose smoke"
@@ -173,5 +179,6 @@ jobs:
           name: observability-runtime-contract
           path: |
             .local/reports/observability_runtime_contract.json
+            .local/reports/notification_outbox_contract.json
             dist
           if-no-files-found: error

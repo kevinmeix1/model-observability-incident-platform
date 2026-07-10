@@ -70,6 +70,45 @@ services:
     stop_grace_period: 15s
     restart: unless-stopped
 
+  notification-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: model-observability-incident-platform:local
+    profiles: ["delivery"]
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    entrypoint: ["python", "-m", "model_observability_platform.notification_worker"]
+    command:
+      - --state-root
+      - /var/lib/model-observability
+      - --worker-id
+      - compose-notification-worker
+      - --batch-size
+      - "25"
+      - --lease-seconds
+      - "30"
+      - --poll-seconds
+      - "1"
+    environment:
+      OBSERVABILITY_STATE_ROOT: /var/lib/model-observability
+    read_only: true
+    init: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    volumes:
+      - observability-state:/var/lib/model-observability
+    networks: [control-plane]
+    stop_grace_period: 10s
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v3.5.4
     profiles: ["observability"]

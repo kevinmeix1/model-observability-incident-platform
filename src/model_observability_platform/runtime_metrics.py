@@ -17,6 +17,14 @@ CHECKS = (
     "freshness",
 )
 SEVERITIES = ("low", "medium", "high", "critical")
+NOTIFICATION_STATES = ("pending", "in_flight", "delivered", "dead_letter")
+NOTIFICATION_OUTCOMES = (
+    "in_flight",
+    "lease_expired",
+    "retry_scheduled",
+    "delivered",
+    "dead_letter",
+)
 
 
 class RuntimeMetrics:
@@ -78,6 +86,18 @@ class RuntimeMetrics:
             ("transition", "severity"),
             registry=self.registry,
         )
+        self.notification_depth = Gauge(
+            "model_observability_notification_outbox_events",
+            "Current transactional outbox events by bounded delivery state.",
+            ("status",),
+            registry=self.registry,
+        )
+        self.notification_attempts = Gauge(
+            "model_observability_notification_delivery_attempts",
+            "Persisted notification delivery attempts by bounded outcome.",
+            ("outcome",),
+            registry=self.registry,
+        )
         self.last_evaluation = Gauge(
             "model_observability_last_evaluation_timestamp_seconds",
             "Unix timestamp of the latest accepted telemetry evaluation.",
@@ -90,6 +110,10 @@ class RuntimeMetrics:
             self.feature_psi.labels(feature).set(0)
         for severity in SEVERITIES:
             self.open_incidents.labels(severity).set(0)
+        for status in NOTIFICATION_STATES:
+            self.notification_depth.labels(status).set(0)
+        for outcome in NOTIFICATION_OUTCOMES:
+            self.notification_attempts.labels(outcome).set(0)
 
     def observe_http(
         self,
@@ -141,3 +165,13 @@ class RuntimeMetrics:
         counts = summary.get("open_by_severity", {})
         for severity in SEVERITIES:
             self.open_incidents.labels(severity).set(int(counts.get(severity, 0)))
+        notification_counts = summary.get("notifications_by_status", {})
+        for status in NOTIFICATION_STATES:
+            self.notification_depth.labels(status).set(
+                int(notification_counts.get(status, 0))
+            )
+        attempt_counts = summary.get("notification_attempts_by_outcome", {})
+        for outcome in NOTIFICATION_OUTCOMES:
+            self.notification_attempts.labels(outcome).set(
+                int(attempt_counts.get(outcome, 0))
+            )

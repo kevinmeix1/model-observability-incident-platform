@@ -87,7 +87,8 @@ to force an overwrite is intentionally rejected.
 
 The API is stateless apart from its mounted database. Roll back the image while
 preserving the state volume only when the database schema is backward
-compatible. Schema version `1` is checked at readiness.
+compatible. Schema version `2` is checked at readiness; startup migrates the
+additive version 1 schema and fails closed on a newer unknown version.
 
 For an incompatible future migration:
 
@@ -108,6 +109,38 @@ Attach only bounded metadata:
 - root-cause category and repair action
 - recovery event sequence
 - trace IDs and dashboard/report artifact hashes
+
+## Notification Outbox Backlog
+
+Symptoms:
+
+- `model_observability_notification_outbox_events{status="pending"}` rises;
+- `in_flight` remains non-zero beyond the configured lease duration;
+- `dead_letter` increases;
+- downstream incident routing is missing a lifecycle version.
+
+Triage:
+
+1. Read `GET /v1/runtime` and `GET /v1/notifications?status=dead_letter`.
+2. Inspect `GET /v1/notifications/{event_id}/attempts` for lease expiry,
+   retry scheduling, and the bounded receiver error.
+3. Compare the event's `incident_version` with the incident event history.
+4. Verify receiver health and its idempotency-receipt store before replay.
+5. Restart a failed worker only after its lease expires; an old worker cannot
+   complete an event after another owner takes the lease.
+
+Local proof:
+
+```bash
+make notification-outbox-contract PYTHON=.venv/bin/python
+python -m json.tool .local/reports/notification_outbox_contract.json
+```
+
+The local contract has no mutating replay endpoint. That is deliberate: a real
+replay operation needs authentication, an operator reason, immutable audit,
+and a receiver readiness check. In production, move a dead-letter row back to
+the relay queue through an audited administrative workflow while preserving
+its original CloudEvent ID.
 
 Do not attach raw feature values or full telemetry windows unless an approved
 privacy workflow explicitly requires them.

@@ -1,21 +1,35 @@
-.PHONY: demo dashboard reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan resource-health-status advanced-device-sharing admin-access-diagnostics inplace-resize-plan topology-plan kuberay-plan inference-gateway-plan semantic-telemetry-plan deadline-alerts-plan cost-observability elastic-workload-plan indexed-job-resilience provisioning-admission multikueue-dispatch dag-bundle-plan asset-partitioning-plan airflow-stateful-orchestration airflow-sdk-contract multi-team-readiness event-driven-assets pod-resource-envelopes cohort-fair-sharing flavor-fungibility pending-workload-visibility tenancy-report identity-report performance-budget queue-simulation workload-aware-scheduling runtime-security control-plane-diagnostics memory-qos hpa-scale-zero suspended-job-resources constrained-impersonation incident-evidence-volumes release-admission runtime-init api-run runtime-contract api-smoke test-api lint-runtime compose-config compose-up compose-observability-up compose-smoke compose-down ci-verify kubernetes-plan minikube-up test clean
+.PHONY: demo demo-voice demo-video dashboard reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan resource-health-status advanced-device-sharing admin-access-diagnostics inplace-resize-plan topology-plan kuberay-plan inference-gateway-plan semantic-telemetry-plan deadline-alerts-plan cost-observability elastic-workload-plan indexed-job-resilience provisioning-admission multikueue-dispatch dag-bundle-plan asset-partitioning-plan airflow-stateful-orchestration airflow-sdk-contract multi-team-readiness event-driven-assets pod-resource-envelopes cohort-fair-sharing flavor-fungibility pending-workload-visibility tenancy-report identity-report performance-budget queue-simulation workload-aware-scheduling runtime-security control-plane-diagnostics memory-qos hpa-scale-zero suspended-job-resources constrained-impersonation incident-evidence-volumes release-admission runtime-init api-run runtime-contract notification-outbox-contract notification-worker-once api-smoke test-api lint-runtime verify-observability-lock package package-smoke compose-config compose-up compose-observability-up compose-delivery-up compose-smoke compose-down ci-verify kubernetes-plan minikube-up test clean
 
 PYTHON ?= python3
 OBSERVABILITY_PORT ?= 8081
 PROMETHEUS_PORT ?= 9091
 RUNTIME_FILES := \
+	src/model_observability_platform/__init__.py \
 	src/model_observability_platform/api.py \
 	src/model_observability_platform/checks.py \
+	src/model_observability_platform/dashboard.py \
+	src/model_observability_platform/notification_dispatch.py \
+	src/model_observability_platform/notification_worker.py \
 	src/model_observability_platform/runtime_contract.py \
 	src/model_observability_platform/runtime_metrics.py \
 	src/model_observability_platform/runtime_state.py \
 	src/model_observability_platform/telemetry.py \
 	src/model_observability_platform/tracing.py \
 	tests/test_observability_api.py \
-	tools/smoke_observability_api.py
+	tools/smoke_wheel.py \
+	tools/smoke_notification_outbox.py \
+	tools/smoke_observability_api.py \
+	tools/generate_demo_voice.py \
+	tools/verify_locked_environment.py
 
 demo:
 	PYTHONPATH=src python3 -m model_observability_platform demo --output .local
+
+demo-voice:
+	$(PYTHON) tools/generate_demo_voice.py
+
+demo-video:
+	bash tools/build_demo_video.sh
 
 dashboard:
 	PYTHONPATH=src $(PYTHON) -m model_observability_platform dashboard --output .local
@@ -185,6 +199,12 @@ api-run:
 runtime-contract:
 	PYTHONPATH=src $(PYTHON) tools/smoke_observability_api.py --output .local
 
+notification-outbox-contract:
+	PYTHONPATH=src $(PYTHON) tools/smoke_notification_outbox.py --output .local
+
+notification-worker-once:
+	PYTHONPATH=src $(PYTHON) -m model_observability_platform.notification_worker --state-root .local --once
+
 api-smoke:
 	PYTHONPATH=src $(PYTHON) tools/smoke_observability_api.py --base-url http://127.0.0.1:$(OBSERVABILITY_PORT) --output .local
 
@@ -193,6 +213,16 @@ test-api:
 
 lint-runtime:
 	$(PYTHON) -m ruff check $(RUNTIME_FILES)
+
+verify-observability-lock:
+	$(PYTHON) tools/verify_locked_environment.py requirements-observability.lock
+
+package:
+	rm -rf build dist
+	$(PYTHON) -m build --no-isolation --wheel
+
+package-smoke:
+	$(PYTHON) tools/smoke_wheel.py
 
 compose-config:
 	docker compose config --quiet
@@ -203,20 +233,28 @@ compose-up:
 compose-observability-up:
 	OBSERVABILITY_PORT=$(OBSERVABILITY_PORT) PROMETHEUS_PORT=$(PROMETHEUS_PORT) docker compose --profile observability up --build --detach
 
+compose-delivery-up:
+	OBSERVABILITY_PORT=$(OBSERVABILITY_PORT) docker compose --profile delivery up --build --detach
+
 compose-smoke:
 	@set -eu; \
-	trap 'docker compose --profile observability down --volumes --remove-orphans >/dev/null 2>&1 || true' EXIT; \
-	docker compose --profile observability down --volumes --remove-orphans >/dev/null 2>&1 || true; \
-	OBSERVABILITY_PORT=$(OBSERVABILITY_PORT) docker compose up --build --detach control-plane; \
+	trap 'docker compose --profile observability --profile delivery down --volumes --remove-orphans >/dev/null 2>&1 || true' EXIT; \
+	docker compose --profile observability --profile delivery down --volumes --remove-orphans >/dev/null 2>&1 || true; \
+	OBSERVABILITY_PORT=$(OBSERVABILITY_PORT) docker compose --profile delivery up --build --detach control-plane notification-worker; \
 	for attempt in $$(seq 1 30); do \
 		if PYTHONPATH=src $(PYTHON) -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$(OBSERVABILITY_PORT)/health/ready', timeout=1).read()" 2>/dev/null; then break; fi; \
 		if [ "$$attempt" -eq 30 ]; then docker compose logs control-plane; exit 1; fi; \
 		sleep 1; \
 	done; \
-	PYTHONPATH=src $(PYTHON) tools/smoke_observability_api.py --base-url http://127.0.0.1:$(OBSERVABILITY_PORT) --output .local
+	PYTHONPATH=src $(PYTHON) tools/smoke_observability_api.py --base-url http://127.0.0.1:$(OBSERVABILITY_PORT) --output .local; \
+	for attempt in $$(seq 1 20); do \
+		if PYTHONPATH=src $(PYTHON) -c "import json, urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:$(OBSERVABILITY_PORT)/v1/runtime', timeout=1)); c=r['summary']['notifications_by_status']; assert c['delivered'] > 0 and c['pending'] == 0 and c['in_flight'] == 0" 2>/dev/null; then break; fi; \
+		if [ "$$attempt" -eq 20 ]; then docker compose logs notification-worker; exit 1; fi; \
+		sleep 1; \
+	done
 
 compose-down:
-	docker compose --profile observability down --volumes --remove-orphans
+	docker compose --profile observability --profile delivery down --volumes --remove-orphans
 
 ci-verify:
 	PYTHONPATH=src python3 -m compileall -q src tests
@@ -357,7 +395,7 @@ minikube-up:
 	@echo "  kubectl apply -f gitops/gitops-promotion.yaml"
 
 test:
-	PYTHONPATH=src python3 -m unittest discover -s tests -v
+	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v
 
 clean:
 	rm -rf .local

@@ -1146,7 +1146,13 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
             self.assertFalse(result["report"]["passed"])
             self.assertGreaterEqual(result["incidents"]["open_count"], 4)
-            self.assertTrue((root / "reports" / "model_observability_dashboard.html").exists())
+            dashboard_path = root / "reports" / "model_observability_dashboard.html"
+            self.assertTrue(dashboard_path.exists())
+            dashboard = dashboard_path.read_text(encoding="utf-8")
+            self.assertIn("Live Incident Response Lab", dashboard)
+            self.assertIn('data-testid="incident-response-lab"', dashboard)
+            self.assertIn("function buildEvaluation", dashboard)
+            self.assertIn('apiJson("/v1/evaluations"', dashboard)
             self.assertTrue((root / "reports" / "index.html").exists())
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "device_allocation_plan.json").exists())

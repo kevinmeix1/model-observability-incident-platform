@@ -116,6 +116,8 @@ def run_contract(client: HttpClient | InProcessClient) -> dict[str, Any]:
     require(status, 200, "evaluation replay")
     status, listing, _ = client.request("GET", "/v1/incidents")
     require(status, 200, "incident listing")
+    status, notifications, _ = client.request("GET", "/v1/notifications")
+    require(status, 200, "notification outbox listing")
 
     if not isinstance(listing, dict) or not listing.get("incidents"):
         raise RuntimeError("evaluation did not create an incident")
@@ -146,6 +148,12 @@ def run_contract(client: HttpClient | InProcessClient) -> dict[str, Any]:
     status, runtime, _ = client.request("GET", "/v1/runtime")
     require(status, 200, "runtime summary")
 
+    notification_items = (
+        notifications.get("notifications", []) if isinstance(notifications, dict) else []
+    )
+    first_notification = notification_items[0] if notification_items else {}
+    cloud_event = first_notification.get("cloud_event", {})
+
     checks = {
         "readiness": health == {"ready": True},
         "failed_evaluation_freezes_release": isinstance(first, dict)
@@ -165,6 +173,11 @@ def run_contract(client: HttpClient | InProcessClient) -> dict[str, Any]:
         and MODEL_VERSION not in metrics,
         "durable_summary": isinstance(runtime, dict)
         and runtime.get("state_backend") == "sqlite-wal",
+        "transactional_outbox": len(notification_items) >= len(first["incident_changes"])
+        and runtime.get("notification_delivery") == "transactional-outbox-at-least-once",
+        "cloudevents_envelope": cloud_event.get("specversion") == "1.0"
+        and cloud_event.get("id") == first_notification.get("event_id")
+        and cloud_event.get("subject") == first_notification.get("incident_id"),
     }
     if not all(checks.values()):
         failed = [name for name, passed in checks.items() if not passed]
@@ -184,6 +197,12 @@ def run_contract(client: HttpClient | InProcessClient) -> dict[str, Any]:
             "severity": incident["severity"],
             "status": acknowledged["incident"]["status"],
             "event_count": events["count"],
+        },
+        "notification_outbox": {
+            "event_count": len(notification_items),
+            "first_event_id": first_notification["event_id"],
+            "format": "cloudevents-1.0-json",
+            "delivery_semantics": runtime["notification_delivery"],
         },
         "runtime": runtime,
     }

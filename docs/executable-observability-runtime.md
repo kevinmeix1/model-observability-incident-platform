@@ -38,12 +38,13 @@ One `BEGIN IMMEDIATE` SQLite transaction covers:
 2. incident create, evidence update, or reopen
 3. recovery-streak update or auto-resolution
 4. immutable incident-event append
-5. release decision calculation
-6. evaluation response persistence
+5. CloudEvents notification append to the transactional outbox
+6. release decision calculation
+7. evaluation response persistence
 
 The API does not return success before this transaction commits. A failed
-transaction cannot leave an incident without its audit event or an evaluation
-without its stored response.
+transaction cannot leave an incident without its audit event and notification,
+or an evaluation without its stored response.
 
 SQLite runs in WAL mode. WAL allows readers and a writer to make progress with
 less interference, but SQLite still serializes writers. That is why the local
@@ -60,6 +61,7 @@ Evaluation and transition keys solve different retry boundaries:
 | Incident transition | `transition_id` plus canonical transition hash | Same transition replays; changed payload returns 409 |
 | Incident write | Stable model, policy, and check fingerprint | Repeated failures update evidence and occurrence count |
 | Operator concurrency | `expected_version` | Stale acknowledge or resolve returns 409 |
+| Notification delivery | CloudEvent `source` plus deterministic `id` | Duplicate receipt is harmless; changed payload fails closed |
 
 Observed drift or latency values are not part of the incident fingerprint. If
 they were, ordinary measurement movement would create alert storms instead of
@@ -86,6 +88,22 @@ This hysteresis avoids clearing an incident after one favorable sample. A
 production policy would tune the count and cadence by signal, severity, and
 business impact.
 
+## Notification Delivery
+
+Incident notifications use an outbox rather than an inline webhook. Workers
+claim due rows under expiring leases, and SQLite's write transaction makes
+claims disjoint. A query-level predecessor check preserves event order within
+one incident while allowing unrelated incidents to progress concurrently.
+
+Every attempt is immutable. A crashed attempt becomes `lease_expired` when a
+new worker takes ownership; the old worker is then unable to complete it.
+Failures schedule capped exponential backoff and eventually enter
+`dead_letter`. Delivery remains at least once, so the receiver persists the
+CloudEvent ID before applying side effects.
+
+The complete state machine and production Postgres mapping are documented in
+the [transactional notification outbox](transactional-notification-outbox.md).
+
 ## Metrics
 
 The service owns a dedicated Prometheus registry so tests and embedded runtimes
@@ -96,6 +114,8 @@ timestamps rather than "time since" values.
 Labels are limited to fixed route templates, HTTP status class, known check
 names, known features, outcomes, transitions, and severity. Evaluation,
 request, incident, customer, and model-version identifiers are excluded.
+Outbox depth uses only the fixed states `pending`, `in_flight`, `delivered`,
+and `dead_letter`; event IDs remain in logs and traces rather than labels.
 
 This follows Prometheus guidance on
 [metric naming and base units](https://prometheus.io/docs/practices/naming/) and
@@ -144,6 +164,7 @@ The image and Compose topology use:
 - finite state initialization with `service_completed_successfully`
 - readiness-gated startup and graceful SIGTERM handling
 - optional Prometheus profile rather than a mandatory observability stack
+- optional single delivery worker with the same non-root and read-only controls
 
 ## Verification
 
@@ -158,9 +179,14 @@ The image and Compose topology use:
 - schema and body bounds
 - W3C trace propagation
 - low-cardinality metric output
+- atomic notification creation and CloudEvents envelopes
+- disjoint claims, lease takeover, stale-worker fencing, and ordered delivery
+- retry, immutable attempt, idempotent receiver, and dead-letter behavior
+- additive schema migration and unknown-future-version rejection
 - readiness and runtime metadata
 
-GitHub Actions repeats the smoke against the built container. Local Docker
+GitHub Actions repeats the smoke against the built API and notification-worker
+containers and waits for the persisted outbox backlog to drain. Local Docker
 verification is not claimed on machines where Docker is unavailable.
 
 ## Production Migration
@@ -176,3 +202,8 @@ Move to Postgres when any of these become true:
 The migration should preserve evaluation hashes, incident fingerprints,
 transition keys, versions, and event ordering. Those are domain contracts, not
 SQLite implementation details.
+
+For the outbox relay, use row locking such as `FOR UPDATE SKIP LOCKED`, partial
+indexes for due rows, multiple stateless workers, jittered retry, and a durable
+broker. The receiver still needs event-ID deduplication because the delivery
+contract remains at least once.

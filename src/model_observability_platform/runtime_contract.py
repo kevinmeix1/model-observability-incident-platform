@@ -5,8 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from . import __version__
+
 MODEL_NAME = "credit-risk-router"
-SERVER_VERSION = "0.2.0"
+SERVER_VERSION = __version__
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"
 MODEL_VERSION_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$"
 

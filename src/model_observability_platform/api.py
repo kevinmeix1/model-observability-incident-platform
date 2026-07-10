@@ -34,6 +34,8 @@ from .runtime_state import (
     IncidentNotFound,
     IncidentStore,
     InvalidTransition,
+    NotificationNotFound,
+    OutboxLeaseConflict,
     TransitionConflict,
 )
 from .tracing import create_tracing
@@ -190,6 +192,7 @@ def route_key(method: str, path: str) -> str:
         "/v1/runtime",
         "/v1/evaluations",
         "/v1/incidents",
+        "/v1/notifications",
         "/metrics",
         "/docs",
         "/openapi.json",
@@ -200,6 +203,11 @@ def route_key(method: str, path: str) -> str:
         if suffix in {"events", "acknowledge", "resolve"}:
             return f"/v1/incidents/{{incident_id}}/{suffix}"
         return "/v1/incidents/{incident_id}"
+    if path.startswith("/v1/notifications/"):
+        suffix = path.rsplit("/", 1)[-1]
+        if suffix == "attempts":
+            return "/v1/notifications/{event_id}/attempts"
+        return "/v1/notifications/{event_id}"
     return "unmatched"
 
 
@@ -306,6 +314,7 @@ def create_app(
     @app.exception_handler(EvaluationConflict)
     @app.exception_handler(TransitionConflict)
     @app.exception_handler(InvalidTransition)
+    @app.exception_handler(OutboxLeaseConflict)
     async def conflict_error(_: Request, exc: RuntimeError) -> JSONResponse:
         return JSONResponse(status_code=409, content={"error": str(exc)})
 
@@ -314,6 +323,16 @@ def create_app(
         return JSONResponse(
             status_code=404,
             content={"error": f"incident not found: {exc}"},
+        )
+
+    @app.exception_handler(NotificationNotFound)
+    async def notification_not_found_error(
+        _: Request,
+        exc: NotificationNotFound,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"notification not found: {exc}"},
         )
 
     @app.middleware("http")
@@ -406,6 +425,8 @@ def create_app(
             "model_name": settings.model_name,
             "state_backend": "sqlite-wal",
             "idempotency": "evaluation-and-transition-keys",
+            "notification_delivery": "transactional-outbox-at-least-once",
+            "notification_format": "cloudevents-1.0-json",
             "auto_resolve_after": settings.auto_resolve_after,
             "telemetry": {
                 "metrics": "prometheus",
@@ -526,6 +547,26 @@ def create_app(
         events = store.incident_events(incident_id, limit=limit)
         return {"count": len(events), "events": events}
 
+    @app.get("/v1/notifications")
+    async def notifications(
+        status: str | None = Query(default=None),
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> dict[str, Any]:
+        try:
+            items = store.list_notifications(status=status, limit=limit)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        metrics.refresh_incidents(store.summary())
+        return {"count": len(items), "notifications": items}
+
+    @app.get("/v1/notifications/{event_id}/attempts")
+    async def notification_attempts(
+        event_id: str,
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> dict[str, Any]:
+        attempts = store.notification_attempts(event_id, limit=limit)
+        return {"count": len(attempts), "attempts": attempts}
+
     async def transition_incident(
         *,
         incident_id: str,
@@ -586,6 +627,7 @@ def create_app(
 
     @app.get("/metrics", include_in_schema=False)
     async def prometheus_metrics() -> Response:
+        metrics.refresh_incidents(store.summary())
         return Response(
             content=generate_latest(metrics.registry),
             media_type=CONTENT_TYPE_LATEST,

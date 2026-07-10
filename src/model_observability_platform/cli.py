@@ -267,16 +267,21 @@ def render_current_dashboard(output: str | Path) -> dict:
     if missing:
         raise FileNotFoundError(f"missing dashboard inputs: {', '.join(missing)}")
     runtime_path = root / "reports" / "observability_runtime_contract.json"
+    notification_path = root / "reports" / "notification_outbox_contract.json"
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=read_json(required["report"]),
         incident_summary=read_json(required["incidents"]),
         reliability_plan=read_json(required["reliability"]),
         runtime_contract=read_json(runtime_path) if runtime_path.exists() else None,
+        notification_contract=(
+            read_json(notification_path) if notification_path.exists() else None
+        ),
     )
     return {
         "dashboard": str(dashboard),
         "runtime_contract_included": runtime_path.exists(),
+        "notification_contract_included": notification_path.exists(),
     }
 
 

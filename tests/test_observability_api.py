@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import io
+import sqlite3
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stdout
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -10,6 +14,12 @@ try:
 
     from model_observability_platform.api import Settings, create_app
     from model_observability_platform.dashboard import render_dashboard
+    from model_observability_platform.notification_dispatch import (
+        OutboxDispatcher,
+        SqliteReceiptSink,
+    )
+    from model_observability_platform.notification_worker import main as notification_worker_main
+    from model_observability_platform.runtime_state import IncidentStore, OutboxLeaseConflict
     from model_observability_platform.telemetry import generate_records
 
     RUNTIME_AVAILABLE = True
@@ -19,6 +29,11 @@ except ImportError:
     create_app = None
     generate_records = None
     render_dashboard = None
+    OutboxDispatcher = None
+    SqliteReceiptSink = None
+    notification_worker_main = None
+    OutboxLeaseConflict = None
+    IncidentStore = None
     RUNTIME_AVAILABLE = False
 
 
@@ -129,6 +144,33 @@ class ObservabilityApiTest(unittest.TestCase):
             self.assertEqual(format(server_span.context.trace_id, "032x"), TRACE_ID)
             self.assertEqual(server_span.attributes["http.route"], "/v1/evaluations")
             self.assertNotIn("url.full", server_span.attributes)
+
+    def test_runtime_schema_migrates_v1_and_rejects_future_versions(self) -> None:
+        legacy_path = self.state_root / "legacy" / "incidents.sqlite3"
+        legacy_path.parent.mkdir(parents=True)
+        with sqlite3.connect(legacy_path) as connection:
+            connection.execute(
+                "CREATE TABLE runtime_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+            )
+            connection.execute(
+                "INSERT INTO runtime_metadata(key, value) VALUES ('schema_version', '1')"
+            )
+        migrated = IncidentStore(legacy_path)
+        self.assertTrue(migrated.ready())
+        self.assertEqual(migrated.summary()["schema_version"], "2")
+        self.assertEqual(migrated.summary()["notifications_by_status"]["pending"], 0)
+
+        future_path = self.state_root / "future" / "incidents.sqlite3"
+        future_path.parent.mkdir(parents=True)
+        with sqlite3.connect(future_path) as connection:
+            connection.execute(
+                "CREATE TABLE runtime_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+            )
+            connection.execute(
+                "INSERT INTO runtime_metadata(key, value) VALUES ('schema_version', '99')"
+            )
+        with self.assertRaisesRegex(RuntimeError, "newer than supported"):
+            IncidentStore(future_path)
 
     def test_evaluation_idempotency_survives_restart_and_rejects_conflict(self) -> None:
         payload = self.payload("eval-restart-001", drift=True)
@@ -264,6 +306,184 @@ class ObservabilityApiTest(unittest.TestCase):
             self.assertEqual(bounded["count"], 1)
             self.assertEqual(bounded["events"][0]["event_type"], "resolved")
 
+    def test_incident_events_create_atomic_cloudevents_outbox_records(self) -> None:
+        with TestClient(self.app()) as client:
+            response, incident = self.open_incident(client, "eval-outbox-001")
+            created_changes = response.json()["incident_changes"]
+            listing = client.get("/v1/notifications").json()
+            self.assertEqual(listing["count"], len(created_changes))
+            event_ids = set()
+            for notification in listing["notifications"]:
+                event = notification["cloud_event"]
+                event_ids.add(event["id"])
+                self.assertEqual(event["specversion"], "1.0")
+                self.assertEqual(
+                    event["type"],
+                    "io.github.kevinmeix1.model-observability.incident.lifecycle.v1",
+                )
+                self.assertEqual(event["id"], notification["event_id"])
+                self.assertEqual(event["subject"], notification["incident_id"])
+                self.assertEqual(event["data"]["incident_version"], 1)
+                self.assertEqual(notification["status"], "pending")
+            self.assertEqual(len(event_ids), listing["count"])
+
+            replay = client.post(
+                "/v1/evaluations",
+                json=self.payload("eval-outbox-001", drift=True, errors=True),
+            )
+            self.assertEqual(replay.status_code, 200, replay.text)
+            self.assertTrue(replay.json()["replayed"])
+            self.assertEqual(client.get("/v1/notifications").json()["count"], len(event_ids))
+
+            acknowledgement = client.post(
+                f"/v1/incidents/{incident['incident_id']}/acknowledge",
+                json={
+                    "transition_id": "transition-outbox-ack-001",
+                    "expected_version": incident["version"],
+                    "actor": "oncall-engineer",
+                },
+            )
+            self.assertEqual(acknowledgement.status_code, 200, acknowledgement.text)
+            outbox = client.get("/v1/notifications").json()["notifications"]
+            lifecycle = [
+                item for item in outbox if item["incident_id"] == incident["incident_id"]
+            ]
+            self.assertEqual([item["incident_version"] for item in lifecycle], [1, 2])
+            self.assertEqual([item["event_type"] for item in lifecycle], ["opened", "acknowledged"])
+            metrics = client.get("/metrics").text
+            self.assertIn("model_observability_notification_outbox_events", metrics)
+            self.assertNotIn(next(iter(event_ids)), metrics)
+
+    def test_outbox_claims_are_disjoint_ordered_and_lease_safe(self) -> None:
+        app = self.app()
+        with TestClient(app) as client:
+            _, incident = self.open_incident(client, "eval-outbox-leases-001")
+            acknowledged = client.post(
+                f"/v1/incidents/{incident['incident_id']}/acknowledge",
+                json={
+                    "transition_id": "transition-outbox-leases-001",
+                    "expected_version": incident["version"],
+                    "actor": "oncall-engineer",
+                },
+            )
+            self.assertEqual(acknowledged.status_code, 200, acknowledged.text)
+
+        store = app.state.incident_store
+
+        def claim(worker: str) -> list[dict]:
+            return store.claim_notifications(
+                worker_id=worker,
+                limit=2,
+                lease_seconds=10,
+                claimed_at=NOW,
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first, second = executor.map(claim, ("worker-a", "worker-b"))
+        first_ids = {item["event_id"] for item in first}
+        second_ids = {item["event_id"] for item in second}
+        self.assertTrue(first_ids)
+        self.assertTrue(second_ids)
+        self.assertTrue(first_ids.isdisjoint(second_ids))
+
+        incident_claims = [
+            item
+            for item in [*first, *second]
+            if item["incident_id"] == incident["incident_id"]
+        ]
+        self.assertEqual(len(incident_claims), 1)
+        self.assertEqual(incident_claims[0]["incident_version"], 1)
+        leased = incident_claims[0]
+        original_worker = leased["lease_owner"]
+        takeover = store.claim_notifications(
+            worker_id="worker-takeover",
+            limit=100,
+            lease_seconds=10,
+            claimed_at=NOW + timedelta(seconds=11),
+        )
+        taken = next(item for item in takeover if item["event_id"] == leased["event_id"])
+        with self.assertRaises(OutboxLeaseConflict):
+            store.complete_notification(
+                event_id=leased["event_id"],
+                worker_id=original_worker,
+                delivered=True,
+                completed_at=NOW + timedelta(seconds=12),
+            )
+        retry, _ = store.complete_notification(
+            event_id=taken["event_id"],
+            worker_id="worker-takeover",
+            delivered=False,
+            error="receiver unavailable",
+            max_attempts=3,
+            base_backoff_seconds=2,
+            completed_at=NOW + timedelta(seconds=12),
+        )
+        self.assertEqual(retry["status"], "pending")
+        attempts = store.notification_attempts(taken["event_id"])
+        self.assertEqual(
+            [attempt["outcome"] for attempt in attempts],
+            ["lease_expired", "retry_scheduled"],
+        )
+
+        sink = SqliteReceiptSink(self.state_root / "receiver" / "receipts.sqlite3")
+        dispatcher = OutboxDispatcher(
+            store=store,
+            sink=sink,
+            worker_id="worker-recovery",
+            lease_seconds=10,
+            max_attempts=3,
+            base_backoff_seconds=2,
+        )
+        recovered = dispatcher.run_once(
+            limit=100,
+            now=NOW + timedelta(seconds=17),
+        )
+        self.assertGreaterEqual(recovered["delivered"], 1)
+        delivered = {
+            item["event_id"]: item
+            for item in store.list_notifications(status="delivered")
+        }
+        self.assertIn(taken["event_id"], delivered)
+        receipt_replay = sink.send(delivered[taken["event_id"]]["cloud_event"])
+        self.assertTrue(receipt_replay["replayed"])
+
+        next_claim = store.claim_notifications(
+            worker_id="worker-next-version",
+            limit=100,
+            lease_seconds=10,
+            claimed_at=NOW + timedelta(seconds=18),
+        )
+        incident_versions = [
+            item["incident_version"]
+            for item in next_claim
+            if item["incident_id"] == incident["incident_id"]
+        ]
+        self.assertEqual(incident_versions, [2])
+
+    def test_notification_worker_entrypoint_drains_due_events_once(self) -> None:
+        app = self.app()
+        with TestClient(app) as client:
+            self.open_incident(client, "eval-worker-entrypoint-001")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = notification_worker_main(
+                [
+                    "--state-root",
+                    str(self.state_root),
+                    "--worker-id",
+                    "worker-entrypoint-test",
+                    "--batch-size",
+                    "100",
+                    "--once",
+                ]
+            )
+        self.assertEqual(result, 0)
+        self.assertIn('"event":"notification_dispatch_batch"', output.getvalue())
+        summary = app.state.incident_store.summary()
+        self.assertEqual(summary["notifications_by_status"]["pending"], 0)
+        self.assertEqual(summary["notifications_by_status"]["in_flight"], 0)
+        self.assertGreater(summary["notifications_by_status"]["delivered"], 0)
+
     def test_two_healthy_windows_auto_resolve_open_incidents(self) -> None:
         with TestClient(self.app(auto_resolve_after=2)) as client:
             self.open_incident(client, "eval-recovery-failed")
@@ -327,11 +547,24 @@ class ObservabilityApiTest(unittest.TestCase):
                 },
                 "runtime": runtime,
             },
+            notification_contract={
+                "delivery_semantics": "transactional-outbox-at-least-once",
+                "checks": {
+                    "lease_takeover": True,
+                    "stale_worker_rejected": True,
+                    "ordered_delivery": True,
+                    "dead_letter_terminal_state": True,
+                },
+            },
         )
         html = path.read_text(encoding="utf-8")
         self.assertIn("Executable Runtime", html)
         self.assertIn("sqlite-wal", html)
         self.assertIn("Metric cardinality", html)
+        self.assertIn("Notification Delivery", html)
+        self.assertIn("Stale worker fencing", html)
+        self.assertIn("Live Incident Response Lab", html)
+        self.assertIn("function runRecovery", html)
         self.assertIn('class="table-wrap"', html)
         self.assertNotIn('class="summary"', html)
 

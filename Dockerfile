@@ -18,8 +18,10 @@ COPY pyproject.toml requirements-observability.lock README.md LICENSE ./
 COPY src ./src
 
 RUN python -m pip install --upgrade "pip==25.3" \
-    && python -m pip install --constraint requirements-observability.lock ".[runtime]" \
-    && python -m pip check
+    && python -m pip install --constraint requirements-observability.lock "setuptools==83.0.0" "wheel==0.47.0" \
+    && python -m pip install --no-build-isolation --constraint requirements-observability.lock ".[runtime]" \
+    && python -m pip check \
+    && python -c "from importlib.metadata import version; from model_observability_platform import __version__; assert version('model-observability-incident-platform') == __version__ == '0.3.0'"
 
 USER 65532:65532
 

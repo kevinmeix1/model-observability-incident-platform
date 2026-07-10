@@ -71,7 +71,14 @@ The dependency-free deterministic demo still works with the standard library:
 make demo
 make test
 open .local/reports/model_observability_dashboard.html
+open .local/reports/judge_demo_cockpit.html
 ```
+
+The judge demo cockpit links the incident dashboard, narrated video,
+operational readiness packet, and generated evidence artifacts behind
+interactive release, observability, governance, and operator-handoff filters.
+
+![Judge demo cockpit](docs/screenshots/dashboard-judge-cockpit.jpg)
 
 Exercise the actual HTTP runtime with Python 3.12:
 

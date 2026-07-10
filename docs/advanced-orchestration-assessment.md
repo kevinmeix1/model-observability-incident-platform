@@ -21,7 +21,12 @@ The observability platform had strong checks and incidents, but lacked a control
 - enhanced drift checks
   - mean delta plus PSI-style distribution drift
   - deduplicated incidents with root-cause hints
+- RCA evidence bundle
+  - symptom-first SLO burn evidence
+  - OpenLineage-style run and dataset facets
+  - feature flag context for shadow reads, canary weight, and incident freeze
+  - confidence and missing-evidence fields for incident review
 
 ## Why It Is More Professional
 
-This now models an observability control plane: scheduled telemetry windows, parallel checks, incident creation, severity-based branching, and runbook-oriented response.
+This now models an observability control plane: scheduled telemetry windows, parallel checks, incident creation, severity-based branching, evidence-backed RCA, and runbook-oriented response.

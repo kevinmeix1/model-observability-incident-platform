@@ -90,16 +90,21 @@ def render_dashboard(
     reliability_plan: dict | None = None,
     runtime_contract: dict | None = None,
     notification_contract: dict | None = None,
+    root_cause_evidence: dict | None = None,
 ) -> Path:
     reliability_plan = reliability_plan or {}
     runtime_contract = runtime_contract or {}
     notification_contract = notification_contract or {}
+    root_cause_evidence = root_cause_evidence or {}
     reliability_action = str(reliability_plan.get("recommended_action", "not planned")).replace("_", " ")
     impacted_assets = [str(asset) for asset in reliability_plan.get("impacted_assets", [])]
     runtime_checks = runtime_contract.get("checks", {})
     runtime_summary = runtime_contract.get("runtime", {}).get("summary", {})
     notification_checks = notification_contract.get("checks", {})
     notification_evidence = notification_contract.get("evidence", {})
+    rca_evidence = root_cause_evidence.get("evidence", [])
+    rca_facets = root_cause_evidence.get("lineage_facets", [])
+    rca_flags = root_cause_evidence.get("feature_flag_context", [])
     check_rows = [
         {
             "check": LABELS.get(check["name"], check["name"]),
@@ -127,6 +132,15 @@ def render_dashboard(
             "current": report.get("current_means", {}).get(feature),
         }
         for feature in report.get("reference_means", {})
+    ]
+    rca_rows = [
+        {
+            "signal": str(item.get("signal", "")).replace("_", " "),
+            "supports": root_cause_summary(item.get("supports", "")),
+            "observed": item.get("observed", ""),
+            "source": item.get("source", ""),
+        }
+        for item in rca_evidence[:6]
     ]
     body = f"""
     <!doctype html>
@@ -335,6 +349,16 @@ def render_dashboard(
                 <div><span>Primary root cause</span><strong>{esc(root_cause_summary(incident_summary.get('incidents', [{}])[-1].get('root_cause', 'none')))}</strong></div>
                 <div><span>Incident status</span><strong>{esc('open' if incident_summary.get('open_count', 0) else 'clear')}</strong></div>
               </div>
+            </div>
+            <div class="panel">
+              <h2>Root Cause Evidence</h2>
+              <div class="facts">
+                <div><span>Evidence gate</span><strong>{badge(bool(root_cause_evidence.get('passed', False)))}</strong></div>
+                <div><span>Confidence</span><strong>{esc(root_cause_evidence.get('confidence', 'n/a'))}</strong></div>
+                <div><span>Lineage facets</span><strong>{esc(len(rca_facets))}</strong></div>
+                <div><span>Feature flags</span><strong>{esc(len(rca_flags))}</strong></div>
+              </div>
+              <div class="table-wrap"><table><tr><th>Signal</th><th>Supports</th><th>Observed</th><th>Source</th></tr>{rows(rca_rows, ['signal', 'supports', 'observed', 'source'])}</table></div>
             </div>
           </div>
           <div>

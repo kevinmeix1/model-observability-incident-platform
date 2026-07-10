@@ -50,6 +50,7 @@ from .queue_simulator import build_queue_simulation
 from .release_admission import build_release_admission_decision
 from .reliability_control import build_reliability_plan
 from .resource_health_status import build_resource_health_status_plan
+from .root_cause_evidence import build_root_cause_evidence_bundle
 from .resource_optimizer import build_resource_optimization_report
 from .runtime_security import build_runtime_security_plan
 from .runtime_state import IncidentStore
@@ -123,11 +124,13 @@ def demo(output: str | Path) -> dict:
     suspended_job_resources = build_suspended_job_resource_plan(root)
     constrained_impersonation = build_constrained_impersonation_plan(root)
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
+    root_cause_evidence = build_root_cause_evidence_bundle(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
         incident_summary=incident_summary,
         reliability_plan=reliability_plan,
+        root_cause_evidence=root_cause_evidence,
     )
     supply_chain = build_supply_chain_evidence(
         root,
@@ -194,6 +197,7 @@ def demo(output: str | Path) -> dict:
         "suspended_job_resources": suspended_job_resources,
         "constrained_impersonation": constrained_impersonation,
         "incident_evidence_volume": incident_evidence_volume,
+        "root_cause_evidence": root_cause_evidence,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
@@ -268,6 +272,7 @@ def render_current_dashboard(output: str | Path) -> dict:
         raise FileNotFoundError(f"missing dashboard inputs: {', '.join(missing)}")
     runtime_path = root / "reports" / "observability_runtime_contract.json"
     notification_path = root / "reports" / "notification_outbox_contract.json"
+    root_cause_evidence_path = root / "reports" / "root_cause_evidence_bundle.json"
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=read_json(required["report"]),
@@ -277,11 +282,17 @@ def render_current_dashboard(output: str | Path) -> dict:
         notification_contract=(
             read_json(notification_path) if notification_path.exists() else None
         ),
+        root_cause_evidence=(
+            read_json(root_cause_evidence_path)
+            if root_cause_evidence_path.exists()
+            else None
+        ),
     )
     return {
         "dashboard": str(dashboard),
         "runtime_contract_included": runtime_path.exists(),
         "notification_contract_included": notification_path.exists(),
+        "root_cause_evidence_included": root_cause_evidence_path.exists(),
     }
 
 
@@ -340,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
         "suspended-job-resources",
         "constrained-impersonation",
         "incident-evidence-volumes",
+        "root-cause-evidence",
         "release-admission",
         "runtime-init",
         "dashboard",
@@ -453,6 +465,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_constrained_impersonation_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "incident-evidence-volumes":
         print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "root-cause-evidence":
+        print(json.dumps(build_root_cause_evidence_bundle(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":
         print(json.dumps(build_release_admission_decision(args.output), indent=2, sort_keys=True))
     return 0

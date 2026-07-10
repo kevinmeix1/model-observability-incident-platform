@@ -49,6 +49,7 @@ from model_observability_platform.queue_simulator import build_queue_simulation
 from model_observability_platform.release_admission import build_release_admission_decision, evaluate_release_admission
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_health_status import build_resource_health_status_plan
+from model_observability_platform.root_cause_evidence import build_root_cause_evidence_bundle
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.runtime_security import build_runtime_security_plan
 from model_observability_platform.semantic_telemetry import build_semantic_telemetry_plan
@@ -347,7 +348,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             "concurrency",
         ]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "root_cause_evidence_bundle.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -1070,6 +1071,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "model_observability_dashboard.html",
                 "incident_summary.json",
                 "reliability_control_plan.json",
+                "root_cause_evidence_bundle.json",
                 "governance_evidence_bundle.json",
                 "slo_error_budget.json",
                 "accelerator_capacity_plan.json",
@@ -1151,8 +1153,11 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             dashboard = dashboard_path.read_text(encoding="utf-8")
             self.assertIn("Live Incident Response Lab", dashboard)
             self.assertIn('data-testid="incident-response-lab"', dashboard)
+            self.assertIn("Root Cause Evidence", dashboard)
+            self.assertIn("incidentRootCauseFacet", (root / "reports" / "root_cause_evidence_bundle.json").read_text(encoding="utf-8"))
             self.assertIn("function buildEvaluation", dashboard)
             self.assertIn('apiJson("/v1/evaluations"', dashboard)
+            self.assertTrue(result["root_cause_evidence"]["passed"])
             self.assertTrue((root / "reports" / "index.html").exists())
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "device_allocation_plan.json").exists())
@@ -1190,6 +1195,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "hpa_scale_to_zero_plan.json").exists())
             self.assertTrue((root / "reports" / "suspended_job_resources_plan.json").exists())
             self.assertTrue((root / "reports" / "constrained_impersonation_plan.json").exists())
+            self.assertTrue((root / "reports" / "root_cause_evidence_bundle.json").exists())
             self.assertTrue((root / "reports" / "release_admission_decision.json").exists())
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
             self.assertTrue((root / "reports" / "supply_chain_evidence.json").exists())
@@ -1229,6 +1235,26 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertGreater(first["created_count"], 0)
             self.assertEqual(second["created_count"], 0)
             self.assertEqual(first["open_count"], second["open_count"])
+
+    def test_root_cause_evidence_bundle_explains_compound_incident(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reference = read_csv(generate_window(root / "reference.csv", window="reference"))
+            current = read_csv(generate_window(root / "current.csv", window="current", drift=True, errors=True))
+            report = run_checks(reference, current)
+            write_json(root / "reports" / "observability_report.json", report)
+            create_incidents(root, report)
+            build_reliability_plan(root)
+
+            bundle = build_root_cause_evidence_bundle(root)
+
+            self.assertTrue(bundle["passed"])
+            self.assertGreaterEqual(bundle["confidence"], 0.8)
+            self.assertEqual(bundle["root_cause"], "compound_population_shift_and_serving_degradation")
+            self.assertIn("population_shift", {item["signal"] for item in bundle["evidence"]})
+            self.assertIn("incidentRootCauseFacet", {facet["name"] for facet in bundle["lineage_facets"]})
+            self.assertIn("canary_route_weight", {flag["key"] for flag in bundle["feature_flag_context"]})
+            self.assertTrue((root / "reports" / "root_cause_evidence_bundle.json").exists())
 
     def test_compound_root_cause_is_classified(self) -> None:
         failed = [

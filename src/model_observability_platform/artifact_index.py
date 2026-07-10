@@ -19,6 +19,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Reliability Dashboard", dashboard, "HTML incident-command view for checks, affected assets, and recommended action."),
         ("Incident Summary", "incident_summary.json", "Deduplicated incident record with severity, affected checks, and status counts."),
         ("Reliability Plan", "reliability_control_plan.json", "Root-cause and rollback guidance for high-burn or degraded serving windows."),
+        ("Root Cause Evidence", "root_cause_evidence_bundle.json", "Symptom-first SLO burn evidence, OpenLineage-style facets, feature flag context, and probabilistic RCA confidence."),
         ("Governance Evidence", "governance_evidence_bundle.json", "Risk register, system card, approval record, and reproducibility hashes."),
         ("SLO Error Budget", "slo_error_budget.json", "Freshness, quality, latency, and alerting SLO burn-rate evidence."),
         ("Supply Chain Evidence", "supply_chain_evidence.json", "Artifact hashes, GitHub attestations, SLSA provenance, and Sigstore policy controls."),

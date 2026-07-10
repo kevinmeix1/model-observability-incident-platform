@@ -1,0 +1,152 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: incident-debugger-impersonate-identity
+  namespace: mlops-observability
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["serviceaccounts"]
+    resourceNames: ["evidence-reader"]
+    verbs: ["impersonate:serviceaccount"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: freeze-controller-impersonate-identity
+  namespace: mlops-observability
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["serviceaccounts"]
+    resourceNames: ["incident-status-writer"]
+    verbs: ["impersonate:serviceaccount"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: freeze-controller-impersonate-actions
+  namespace: mlops-observability
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments/status"]
+    verbs:
+      - "impersonate-on:serviceaccount:get"
+      - "impersonate-on:serviceaccount:patch"
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs:
+      - "impersonate-on:serviceaccount:get"
+      - "impersonate-on:serviceaccount:patch"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: freeze-controller-impersonate-identity
+  namespace: mlops-observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: freeze-controller-impersonate-identity
+subjects:
+  - kind: ServiceAccount
+    name: freeze-controller
+    namespace: mlops-observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: freeze-controller-impersonate-actions
+  namespace: mlops-observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: freeze-controller-impersonate-actions
+subjects:
+  - kind: ServiceAccount
+    name: freeze-controller
+    namespace: mlops-observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: incident-debugger-impersonate-actions
+  namespace: mlops-observability
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "pods/log", "events"]
+    verbs:
+      - "impersonate-on:serviceaccount:get"
+      - "impersonate-on:serviceaccount:list"
+      - "impersonate-on:serviceaccount:watch"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-debugger-impersonate-identity
+  namespace: mlops-observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: incident-debugger-impersonate-identity
+subjects:
+  - kind: ServiceAccount
+    name: incident-debugger
+    namespace: mlops-observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-debugger-impersonate-actions
+  namespace: mlops-observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: incident-debugger-impersonate-actions
+subjects:
+  - kind: ServiceAccount
+    name: incident-debugger
+    namespace: mlops-observability
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-constrained-impersonation
+  namespace: mlops-observability
+spec:
+  groups:
+    - name: observability.constrained-impersonation
+      rules:
+        - alert: ObservabilityLegacyImpersonateVerbDetected
+          expr: max(observability_rbac_legacy_impersonate_grants{namespace="mlops-observability"}) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Legacy broad impersonate verb is present without constrained action grants
+        - alert: ObservabilityConstrainedImpersonationAuditMissing
+          expr: max(observability_impersonation_audit_missing_constraint{namespace="mlops-observability"}) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Impersonated incident request is missing authenticationMetadata.impersonationConstraint
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: constrained-impersonation-audit-policy
+  namespace: mlops-observability
+data:
+  audit-policy.yaml: |
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    rules:
+      - level: Metadata
+        omitStages:
+          - RequestReceived
+        verbs:
+          - "impersonate:serviceaccount"
+          - "impersonate-on:serviceaccount:get"
+          - "impersonate-on:serviceaccount:patch"
+        resources:
+          - group: "authentication.k8s.io"
+            resources: ["serviceaccounts"]

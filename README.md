@@ -154,6 +154,8 @@ For Kubernetes v1.36 HPA scale-to-zero, `HPAScaleToZero`, Object/External wake m
 
 For Kubernetes v1.36 suspended Job resource mutation, `MutablePodResourcesForSuspendedJobs`, and queue-time CPU/memory/GPU right-sizing for incident root-cause, drift diagnostic, and retention replay Jobs before unsuspend, see [suspended Job resources](docs/suspended-job-resources.md).
 
+For Kubernetes v1.36 constrained impersonation, `ConstrainedImpersonation`, and least-privilege incident support with separate identity and action authorization, see [constrained impersonation](docs/constrained-impersonation.md).
+
 For incident, drift, and retention tenant quotas, Kueue cohorts, Airflow pools, chargeback labels, and noisy-neighbor controls, see [multi-tenant fairness](docs/multi-tenant-fairness.md).
 
 For projected service-account tokens, External Secrets, SPIFFE identities, and keyless observability task access, see [workload identity](docs/workload-identity.md).

@@ -56,6 +56,7 @@ def render_artifact_index(root: str | Path, *, title: str, description: str, das
         ("Memory QoS", "memory_qos_plan.json", "Kubernetes v1.36 MemoryQoS, TieredReservation, cgroup v2, PSI, and memory.high guardrails for incident automation."),
         ("HPA Scale To Zero", "hpa_scale_to_zero_plan.json", "Kubernetes v1.36 HPAScaleToZero for diagnostic workers with Object and External metric wakeups."),
         ("Suspended Job Resources", "suspended_job_resources_plan.json", "Kubernetes v1.36 MutablePodResourcesForSuspendedJobs for queued incident root-cause, drift diagnostic, and retention replay right-sizing."),
+        ("Constrained Impersonation", "constrained_impersonation_plan.json", "Kubernetes v1.36 ConstrainedImpersonation for least-privilege incident debugging and rollout-freeze support."),
         ("Release Admission", "release_admission_decision.json", "Fail-closed rollout freeze record combining incidents, SLOs, queues, governance, and provenance."),
         ("Tenant Fairness", "tenancy_fairness_report.json", "Incident, drift, and retention tenant quotas with Kueue cohorts and cost labels."),
         ("Workload Identity", "identity_access_report.json", "Keyless identities for telemetry collection, drift evaluation, incident routing, and alerting."),

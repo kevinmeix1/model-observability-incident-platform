@@ -14,6 +14,7 @@ from .checks import run_checks
 from .cloud_migration import build_cloud_migration_plan
 from .cohort_fair_sharing import build_cohort_fair_sharing_plan
 from .control_plane_diagnostics import build_control_plane_diagnostics_plan
+from .constrained_impersonation import build_constrained_impersonation_plan
 from .cost_observability import build_cost_observability_report
 from .dag_bundle_versioning import build_dag_bundle_versioning_plan
 from .dashboard import render_dashboard
@@ -117,6 +118,7 @@ def demo(output: str | Path) -> dict:
     memory_qos = build_memory_qos_plan(root)
     hpa_scale_to_zero = build_hpa_scale_to_zero_plan(root)
     suspended_job_resources = build_suspended_job_resource_plan(root)
+    constrained_impersonation = build_constrained_impersonation_plan(root)
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
@@ -186,6 +188,7 @@ def demo(output: str | Path) -> dict:
         "memory_qos": memory_qos,
         "hpa_scale_to_zero": hpa_scale_to_zero,
         "suspended_job_resources": suspended_job_resources,
+        "constrained_impersonation": constrained_impersonation,
         "incident_evidence_volume": incident_evidence_volume,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
@@ -267,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         "memory-qos",
         "hpa-scale-zero",
         "suspended-job-resources",
+        "constrained-impersonation",
         "incident-evidence-volumes",
         "release-admission",
     ]:
@@ -369,6 +373,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_hpa_scale_to_zero_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "suspended-job-resources":
         print(json.dumps(build_suspended_job_resource_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "constrained-impersonation":
+        print(json.dumps(build_constrained_impersonation_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "incident-evidence-volumes":
         print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":

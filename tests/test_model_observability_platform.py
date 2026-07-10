@@ -8,6 +8,7 @@ from model_observability_platform.accelerator_plan import build_accelerator_capa
 from model_observability_platform.admin_access_diagnostics import build_admin_access_diagnostic_plan
 from model_observability_platform.advanced_device_sharing import build_advanced_device_sharing_plan
 from model_observability_platform.alert_routing_remediation import build_alert_routing_remediation_plan
+from model_observability_platform.ai_workload_telemetry import build_ai_workload_telemetry_plan
 from model_observability_platform.airflow_stateful_orchestration import build_airflow_stateful_orchestration_plan
 from model_observability_platform.asset_partitioning import build_asset_partitioning_plan
 from model_observability_platform.chaos import run_chaos_drill
@@ -211,6 +212,21 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((Path(tmp) / "reports" / "trace_report.json").exists())
         for expected in ["kind: ConfigMap", "otlp", "k8sattributes", "memory_limiter", "attributes/semantic_redaction", "gen_ai.input.messages", "incident.payload", "prometheus", "batch"]:
             self.assertIn(expected, collector)
+
+    def test_ai_workload_telemetry_plan_covers_incident_runtime_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = build_ai_workload_telemetry_plan(root)
+            resource_fields = set(plan["required_resource_fields"])
+            otel_fields = set(plan["required_otel_fields"])
+
+            self.assertTrue(plan["passed"])
+            self.assertIn("incident.id", otel_fields)
+            self.assertIn("airflow.asset.uri", otel_fields)
+            self.assertTrue(any(field.startswith("dra.") for field in resource_fields))
+            self.assertTrue(any("last-known-good" in workload["remediation"] for workload in plan["workloads"]))
+            self.assertTrue(any(workload["queue"] == "incident-critical" for workload in plan["workloads"]))
+            self.assertTrue((root / "reports" / "ai_workload_telemetry_plan.json").exists())
 
     def test_chaos_drill_and_chaos_mesh_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]

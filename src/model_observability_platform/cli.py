@@ -8,6 +8,7 @@ from .accelerator_plan import build_accelerator_capacity_plan
 from .admin_access_diagnostics import build_admin_access_diagnostic_plan
 from .advanced_device_sharing import build_advanced_device_sharing_plan
 from .alert_routing_remediation import build_alert_routing_remediation_plan
+from .ai_workload_telemetry import build_ai_workload_telemetry_plan
 from .airflow_stateful_orchestration import build_airflow_stateful_orchestration_plan
 from .artifact_index import render_artifact_index
 from .asset_partitioning import build_asset_partitioning_plan
@@ -127,6 +128,7 @@ def demo(output: str | Path) -> dict:
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
     root_cause_evidence = build_root_cause_evidence_bundle(root)
     alert_routing = build_alert_routing_remediation_plan(root)
+    ai_workload_telemetry = build_ai_workload_telemetry_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
@@ -202,6 +204,7 @@ def demo(output: str | Path) -> dict:
         "incident_evidence_volume": incident_evidence_volume,
         "root_cause_evidence": root_cause_evidence,
         "alert_routing": alert_routing,
+        "ai_workload_telemetry": ai_workload_telemetry,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),

@@ -204,6 +204,26 @@ def render_dashboard(
         .evidence-card span {{ display:block; color:#64748b; font-size:11px; font-weight:800; text-transform:uppercase; margin-bottom:8px; }}
         .evidence-card strong {{ display:block; font-size:15px; line-height:1.25; margin-bottom:8px; overflow-wrap:anywhere; }}
         .evidence-card p {{ margin:0; color:#475569; font-size:12px; line-height:1.45; }}
+        .demo-theater {{ border-left:4px solid #7c3aed; }}
+        .theater-grid {{ display:grid; grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr); gap:16px; align-items:stretch; }}
+        .theater-stage {{ min-height:258px; border:1px solid #dbe3ec; border-radius:8px; padding:16px; background:linear-gradient(135deg,#111827,#312e81); color:#fff; display:grid; align-content:space-between; }}
+        .theater-stage span {{ color:#c4b5fd; font-size:12px; font-weight:800; text-transform:uppercase; }}
+        .theater-stage strong {{ display:block; margin-top:8px; font-size:25px; line-height:1.15; }}
+        .theater-stage p {{ margin:12px 0 0; color:#ddd6fe; line-height:1.45; }}
+        .theater-actions {{ display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }}
+        .cue {{ border:1px solid #c4b5fd; border-radius:6px; padding:9px 11px; background:#fff; color:#4c1d95; font:inherit; font-size:12px; font-weight:900; cursor:pointer; }}
+        .cue.active {{ background:#7c3aed; color:#fff; }}
+        .theater-panel {{ display:grid; gap:12px; }}
+        .theater-kpis {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid #e4e9f0; border-radius:8px; overflow:hidden; }}
+        .theater-kpis div {{ min-height:78px; padding:12px; background:#f8fafc; border-right:1px solid #e4e9f0; }}
+        .theater-kpis div:last-child {{ border-right:0; }}
+        .theater-kpis span {{ display:block; color:#64748b; font-size:11px; margin-bottom:7px; }}
+        .theater-kpis strong {{ display:block; font-size:16px; overflow-wrap:anywhere; }}
+        .theater-progress {{ height:10px; border-radius:999px; overflow:hidden; background:#e2e8f0; }}
+        .theater-progress span {{ display:block; height:100%; width:25%; background:#7c3aed; transition:width .18s ease; }}
+        .theater-notes {{ margin:0; color:#475569; line-height:1.45; }}
+        .theater-links {{ display:flex; flex-wrap:wrap; gap:8px; }}
+        .theater-links a {{ border:1px solid #dbe3ec; border-radius:6px; padding:8px 10px; color:#1d4ed8; font-size:12px; font-weight:800; text-decoration:none; background:#fff; }}
         .facts {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:18px; }}
         .facts div {{ padding:11px 0; min-height:66px; border-bottom:1px solid #e8edf3; }}
         .facts span {{ display:block; color:#64748b; font-size:12px; margin-bottom:7px; }}
@@ -275,7 +295,7 @@ def render_dashboard(
         .blast-item span {{ display:block; margin-top:5px; color:#64748b; font-size:11px; line-height:1.35; }}
         .route-note {{ margin:10px 0 0; color:#64748b; font-size:12px; line-height:1.45; }}
         @media (max-width:900px) {{ header {{ padding:22px 18px; }} main {{ padding:18px; }} .layout,.lower-grid,.response-grid,.routing-grid,.blast-panel {{ grid-template-columns:1fr; }} .facts {{ grid-template-columns:1fr; }} }}
-        @media (max-width:620px) {{ .lab-heading {{ flex-direction:column; }} .api-status {{ width:100%; }} .control-row {{ grid-template-columns:106px minmax(0,1fr) 64px; }} .lab-kpis,.route-summary {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} .lab-kpis div:nth-child(2) {{ border-right:0; }} .lab-kpis div:nth-child(-n+2) {{ border-bottom:1px solid #e4e9f0; }} .event-rail,.route-flow {{ grid-template-columns:1fr; }} .event-step {{ border-right:0; }} .live-incident {{ grid-template-columns:minmax(0,1fr) 70px 72px; }} .live-incident .mini-action {{ grid-column:1 / -1; }} .table-wrap table {{ min-width:0; }} th,td {{ padding:8px 7px; font-size:11px; }} .checks col:nth-child(1),.incidents col:nth-child(2) {{ width:24%; }} .checks col:nth-child(2),.checks col:nth-child(3),.incidents col:nth-child(3),.incidents col:nth-child(5) {{ width:15%; }} .checks col:nth-child(4),.incidents col:nth-child(4) {{ width:31%; }} .checks col:nth-child(5),.incidents col:nth-child(1) {{ width:15%; }} .evidence-head {{ flex-direction:column; }} .evidence-grid {{ grid-template-columns:1fr; }} }}
+        @media (max-width:620px) {{ .lab-heading {{ flex-direction:column; }} .api-status {{ width:100%; }} .control-row {{ grid-template-columns:106px minmax(0,1fr) 64px; }} .lab-kpis,.route-summary {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} .lab-kpis div:nth-child(2) {{ border-right:0; }} .lab-kpis div:nth-child(-n+2) {{ border-bottom:1px solid #e4e9f0; }} .event-rail,.route-flow {{ grid-template-columns:1fr; }} .event-step {{ border-right:0; }} .live-incident {{ grid-template-columns:minmax(0,1fr) 70px 72px; }} .live-incident .mini-action {{ grid-column:1 / -1; }} .table-wrap table {{ min-width:0; }} th,td {{ padding:8px 7px; font-size:11px; }} .checks col:nth-child(1),.incidents col:nth-child(2) {{ width:24%; }} .checks col:nth-child(2),.checks col:nth-child(3),.incidents col:nth-child(3),.incidents col:nth-child(5) {{ width:15%; }} .checks col:nth-child(4),.incidents col:nth-child(4) {{ width:31%; }} .checks col:nth-child(5),.incidents col:nth-child(1) {{ width:15%; }} .evidence-head {{ flex-direction:column; }} .evidence-grid,.theater-grid,.theater-kpis {{ grid-template-columns:1fr; }} .theater-kpis div {{ border-right:0; border-bottom:1px solid #e4e9f0; }} .theater-kpis div:last-child {{ border-bottom:0; }} }}
       </style>
     </head>
     <body>
@@ -307,6 +327,58 @@ def render_dashboard(
             <div class="evidence-card"><span>Response</span><strong>Routing and remediation are guarded</strong><p>Alert grouping, inhibition, receiver timing, blast radius, and human approval gates are visible in the triage lab.</p></div>
           </div>
         </section>
+        <section class="panel demo-theater" data-testid="demo-theater">
+          <div class="evidence-head">
+            <div><h2>Judge Demo Theater</h2><p>Demo the incident control plane like an on-call review: detect, explain, route, recover, and prove the evidence was durable.</p></div>
+            <span class="badge neutral">narrated demo</span>
+          </div>
+          <div class="theater-grid">
+            <div class="theater-stage" aria-live="polite">
+              <div><span id="theaterCue">Opening</span><strong id="theaterTitle">Start with model reliability risk</strong><p id="theaterBody">Explain that this platform watches whether deployed models remain safe to operate, not just whether an API is up.</p></div>
+              <div class="theater-actions">
+                <button type="button" class="cue active" data-demo-cue="0">Detect</button>
+                <button type="button" class="cue" data-demo-cue="1">Incident</button>
+                <button type="button" class="cue" data-demo-cue="2">Route</button>
+                <button type="button" class="cue" data-demo-cue="3">Recover</button>
+              </div>
+            </div>
+            <div class="theater-panel">
+              <div class="theater-kpis">
+                <div><span>Video</span><strong>incident response walkthrough</strong></div>
+                <div><span>Voice</span><strong>edge-tts neural narration</strong></div>
+                <div><span>Signals</span><strong>drift, SLO, outbox, lineage</strong></div>
+                <div><span>Evidence</span><strong>runtime + static reports</strong></div>
+              </div>
+              <div class="theater-progress"><span id="theaterProgress"></span></div>
+              <p id="theaterNotes" class="theater-notes">Reviewer path: run <code>make demo</code>, then <code>make api-run</code> for live incident creation and recovery.</p>
+              <div class="theater-links">
+                <a href="../../docs/demo/model-observability-judge-demo.mp4">Watch video</a>
+                <a href="../../docs/judge-demo.md">Demo script</a>
+                <a href="../../docs/demo-narration.txt">Narration text</a>
+                <a href="index.html">Artifact index</a>
+              </div>
+            </div>
+          </div>
+        </section>
+        <script>
+          function renderDemoTheater(index) {{
+            const cues = [
+              {{cue: "Detect", title: "Start with model reliability risk", body: "Explain that this platform watches whether deployed models remain safe to operate, not just whether an API is up.", notes: "Open with global health, failed checks, severity, and bounded telemetry inputs."}},
+              {{cue: "Incident", title: "Create a durable incident", body: "Use the live lab to submit a degraded window and show incident dedupe, SQLite WAL state, and CloudEvents outbox delivery.", notes: "This proves the dashboard is connected to transactional runtime evidence when the API is running."}},
+              {{cue: "Route", title: "Triage by root cause and lineage", body: "Move to alert routing, inhibition, receiver timing, impacted assets, and guarded remediation.", notes: "Judges should hear why fewer alerts with better context beats noisy dashboards."}},
+              {{cue: "Recover", title: "Show recovery and rollout protection", body: "Finish with two-window recovery, stale worker fencing, last-known-good dashboard publishing, and release freeze logic.", notes: "The project demonstrates observability as a release control plane, not passive reporting."}}
+            ];
+            const item = cues[index] || cues[0];
+            document.getElementById("theaterCue").textContent = item.cue;
+            document.getElementById("theaterTitle").textContent = item.title;
+            document.getElementById("theaterBody").textContent = item.body;
+            document.getElementById("theaterNotes").textContent = item.notes;
+            document.getElementById("theaterProgress").style.width = (((index + 1) / cues.length) * 100) + "%";
+            document.querySelectorAll("[data-demo-cue]").forEach((button) => button.classList.toggle("active", Number(button.dataset.demoCue) === index));
+          }}
+          document.querySelectorAll("[data-demo-cue]").forEach((button) => button.addEventListener("click", () => renderDemoTheater(Number(button.dataset.demoCue))));
+          renderDemoTheater(0);
+        </script>
         <section class="panel response-lab" data-testid="incident-response-lab">
           <div class="lab-heading">
             <div><h2>Live Incident Response Lab</h2><p>Submit bounded telemetry to the running API, inspect the durable incident transaction, and watch CloudEvents delivery recover.</p></div>

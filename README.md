@@ -17,6 +17,8 @@ failure behavior can be reviewed without cloud credentials.
 
 ![Judge evidence deck](docs/screenshots/dashboard-evidence-deck.png)
 
+![Judge demo theater](docs/screenshots/dashboard-demo-theater.png)
+
 ## What Is Executable
 
 | Capability | Local evidence | Integrated evidence | Production mapping |

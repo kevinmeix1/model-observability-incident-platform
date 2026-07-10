@@ -8,13 +8,14 @@ SUBTITLES="${4:-.local/demo/model-observability-judge-demo.srt}"
 
 screenshots=(
   "dashboard.png"
+  "dashboard-demo-theater.png"
   "dashboard-recovery.png"
   "dashboard-delivery.png"
   "dashboard-root-cause-evidence.png"
   "dashboard-alert-routing-triage.png"
   "dashboard-mobile.png"
 )
-durations=(60 62 48 44 48 36)
+durations=(60 22 62 48 44 48 36)
 
 command -v ffmpeg >/dev/null || { echo "ffmpeg is required" >&2; exit 1; }
 test -f "$AUDIO" || { echo "Missing narration: run make demo-voice" >&2; exit 1; }

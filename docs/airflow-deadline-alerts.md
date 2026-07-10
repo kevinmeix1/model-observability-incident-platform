@@ -9,6 +9,11 @@
 - Ticket-grade deadlines for diagnostic fanout and dashboard publishing, where the system should keep operating from last-known-good evidence while recovery continues.
 - Bounded callback execution with `AIRFLOW__CALLBACKS__CALLBACK_EXECUTION_TIMEOUT=300`.
 - Idempotent incident dedupe with a `dag_id:run_id:deadline_policy` key.
+- Explicit callback contracts with receiver, owner, retry policy, bounded payload fields, and allowed side effects.
+
+## Callback Contract
+
+Deadline callbacks are intentionally small and auditable. The generated plan records the receiver, owner, dedupe key, retry policy, payload fields, and allowed side effect for each callback. A callback may page, notify, open or update an incident, or request a last-known-good publish task. It must not directly mutate rollout freeze state, run remediation, or include raw telemetry and prediction bodies.
 
 ## Production Notes
 

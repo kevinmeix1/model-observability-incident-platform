@@ -52,6 +52,9 @@ Repeated degraded evaluations should update the same incident fingerprints.
 The delivery worker should return pending and in-flight notification counts to
 zero after each lifecycle action.
 
+The dashboard includes a **Judge Demo Theater** panel that keeps the live review
+focused on detection, durable incidents, alert routing, and recovery evidence.
+
 ## 3. Generate The Narrated Video
 
 The voice dependency is isolated from the exact runtime environment:
@@ -68,6 +71,10 @@ word-boundary timing for synchronized captions. It then normalizes the voice to
 broadcast-style loudness and encodes an H.264/AAC MP4 with a selectable English
 subtitle track, crossfades, and web fast-start metadata. The result is
 `docs/demo/model-observability-judge-demo.mp4`.
+
+Offline voice engines such as Piper or Kokoro can replace the synthesis step
+when a fully local media pipeline is required, but `edge-tts` keeps the committed
+demo natural-sounding and lightweight.
 
 ## Judge Narrative
 

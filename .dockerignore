@@ -1,0 +1,17 @@
+.git
+.github
+.local
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+airflow
+docs
+gitops
+infra
+kubernetes
+monitoring
+tests
+tools
+*.pyc

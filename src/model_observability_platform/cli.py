@@ -34,7 +34,7 @@ from .incidents import create_incidents
 from .indexed_job_resilience import build_indexed_job_resilience_plan
 from .inplace_resize import build_inplace_resize_plan
 from .inference_gateway import build_inference_gateway_plan
-from .io import read_csv, write_json
+from .io import read_csv, read_json, write_json
 from .kuberay_capacity import build_kuberay_capacity_plan
 from .memory_qos import build_memory_qos_plan
 from .multi_team_readiness import build_multi_team_readiness_plan
@@ -52,6 +52,7 @@ from .reliability_control import build_reliability_plan
 from .resource_health_status import build_resource_health_status_plan
 from .resource_optimizer import build_resource_optimization_report
 from .runtime_security import build_runtime_security_plan
+from .runtime_state import IncidentStore
 from .semantic_telemetry import build_semantic_telemetry_plan
 from .slo import build_slo_report
 from .supply_chain import build_supply_chain_evidence
@@ -202,6 +203,28 @@ def demo(output: str | Path) -> dict:
     }
 
 
+def demo_summary(result: dict) -> dict:
+    failed_checks = [
+        check["name"] for check in result["report"]["checks"] if not check["passed"]
+    ]
+    return {
+        "demo_completed": True,
+        "monitoring_passed": result["report"]["passed"],
+        "failed_checks": failed_checks,
+        "incidents": {
+            "created": result["incidents"].get("created_count", 0),
+            "open": result["incidents"].get("open_count", 0),
+            "top_severity": result["incidents"].get("severity", "low"),
+        },
+        "release_frozen": not result["release_admission"]
+        .get("decision", {})
+        .get("admitted", True),
+        "dashboard": result["dashboard"],
+        "artifact_index": result["artifact_index"],
+        "next_runtime_step": "make runtime-contract && make dashboard",
+    }
+
+
 def governance(output: str | Path) -> dict:
     root = Path(output)
     if not (root / "reports" / "observability_report.json").exists():
@@ -219,6 +242,42 @@ def slo_report(output: str | Path) -> dict:
     if not (root / "reports" / "reliability_control_plan.json").exists():
         governance(root)
     return build_slo_report(root)
+
+
+def initialize_runtime(output: str | Path) -> dict:
+    root = Path(output)
+    path = root / "runtime" / "incidents.sqlite3"
+    store = IncidentStore(path)
+    return {
+        "ready": store.ready(),
+        "state_backend": "sqlite-wal",
+        "database": str(path),
+        "summary": store.summary(),
+    }
+
+
+def render_current_dashboard(output: str | Path) -> dict:
+    root = Path(output)
+    required = {
+        "report": root / "reports" / "observability_report.json",
+        "incidents": root / "reports" / "incident_summary.json",
+        "reliability": root / "reports" / "reliability_control_plan.json",
+    }
+    missing = [str(path) for path in required.values() if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"missing dashboard inputs: {', '.join(missing)}")
+    runtime_path = root / "reports" / "observability_runtime_contract.json"
+    dashboard = render_dashboard(
+        root / "reports" / "model_observability_dashboard.html",
+        report=read_json(required["report"]),
+        incident_summary=read_json(required["incidents"]),
+        reliability_plan=read_json(required["reliability"]),
+        runtime_contract=read_json(runtime_path) if runtime_path.exists() else None,
+    )
+    return {
+        "dashboard": str(dashboard),
+        "runtime_contract_included": runtime_path.exists(),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -277,12 +336,18 @@ def main(argv: list[str] | None = None) -> int:
         "constrained-impersonation",
         "incident-evidence-volumes",
         "release-admission",
+        "runtime-init",
+        "dashboard",
     ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
     args = parser.parse_args(argv)
     if args.command == "demo":
-        print(json.dumps(demo(args.output), indent=2, sort_keys=True))
+        print(json.dumps(demo_summary(demo(args.output)), indent=2, sort_keys=True))
+    elif args.command == "runtime-init":
+        print(json.dumps(initialize_runtime(args.output), indent=2, sort_keys=True))
+    elif args.command == "dashboard":
+        print(json.dumps(render_current_dashboard(args.output), indent=2, sort_keys=True))
     elif args.command == "reliability-plan":
         print(json.dumps(build_reliability_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "policy-audit":

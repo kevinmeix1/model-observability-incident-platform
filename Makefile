@@ -1,7 +1,24 @@
-.PHONY: demo reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan resource-health-status advanced-device-sharing admin-access-diagnostics inplace-resize-plan topology-plan kuberay-plan inference-gateway-plan semantic-telemetry-plan deadline-alerts-plan cost-observability elastic-workload-plan indexed-job-resilience provisioning-admission multikueue-dispatch dag-bundle-plan asset-partitioning-plan airflow-stateful-orchestration airflow-sdk-contract multi-team-readiness event-driven-assets pod-resource-envelopes cohort-fair-sharing flavor-fungibility pending-workload-visibility tenancy-report identity-report performance-budget queue-simulation workload-aware-scheduling runtime-security control-plane-diagnostics memory-qos hpa-scale-zero suspended-job-resources constrained-impersonation incident-evidence-volumes release-admission ci-verify kubernetes-plan minikube-up test clean
+.PHONY: demo dashboard reliability-plan policy-audit trace-report chaos-drill optimize-resources network-security gitops-plan dr-plan governance-bundle slo-report cloud-plan supply-chain orchestration-scorecard accelerator-plan device-plan resource-health-status advanced-device-sharing admin-access-diagnostics inplace-resize-plan topology-plan kuberay-plan inference-gateway-plan semantic-telemetry-plan deadline-alerts-plan cost-observability elastic-workload-plan indexed-job-resilience provisioning-admission multikueue-dispatch dag-bundle-plan asset-partitioning-plan airflow-stateful-orchestration airflow-sdk-contract multi-team-readiness event-driven-assets pod-resource-envelopes cohort-fair-sharing flavor-fungibility pending-workload-visibility tenancy-report identity-report performance-budget queue-simulation workload-aware-scheduling runtime-security control-plane-diagnostics memory-qos hpa-scale-zero suspended-job-resources constrained-impersonation incident-evidence-volumes release-admission runtime-init api-run runtime-contract api-smoke test-api lint-runtime compose-config compose-up compose-observability-up compose-smoke compose-down ci-verify kubernetes-plan minikube-up test clean
+
+PYTHON ?= python3
+OBSERVABILITY_PORT ?= 8081
+PROMETHEUS_PORT ?= 9091
+RUNTIME_FILES := \
+	src/model_observability_platform/api.py \
+	src/model_observability_platform/checks.py \
+	src/model_observability_platform/runtime_contract.py \
+	src/model_observability_platform/runtime_metrics.py \
+	src/model_observability_platform/runtime_state.py \
+	src/model_observability_platform/telemetry.py \
+	src/model_observability_platform/tracing.py \
+	tests/test_observability_api.py \
+	tools/smoke_observability_api.py
 
 demo:
 	PYTHONPATH=src python3 -m model_observability_platform demo --output .local
+
+dashboard:
+	PYTHONPATH=src $(PYTHON) -m model_observability_platform dashboard --output .local
 
 reliability-plan:
 	PYTHONPATH=src python3 -m model_observability_platform reliability-plan --output .local
@@ -158,6 +175,48 @@ incident-evidence-volumes:
 
 release-admission:
 	PYTHONPATH=src python3 -m model_observability_platform release-admission --output .local
+
+runtime-init:
+	PYTHONPATH=src $(PYTHON) -m model_observability_platform runtime-init --output .local
+
+api-run:
+	OBSERVABILITY_STATE_ROOT=.local $(PYTHON) -m uvicorn model_observability_platform.api:app --host 127.0.0.1 --port $(OBSERVABILITY_PORT) --no-access-log
+
+runtime-contract:
+	PYTHONPATH=src $(PYTHON) tools/smoke_observability_api.py --output .local
+
+api-smoke:
+	PYTHONPATH=src $(PYTHON) tools/smoke_observability_api.py --base-url http://127.0.0.1:$(OBSERVABILITY_PORT) --output .local
+
+test-api:
+	PYTHONPATH=src $(PYTHON) -m unittest tests.test_observability_api -v
+
+lint-runtime:
+	$(PYTHON) -m ruff check $(RUNTIME_FILES)
+
+compose-config:
+	docker compose config --quiet
+
+compose-up:
+	OBSERVABILITY_PORT=$(OBSERVABILITY_PORT) docker compose up --build --detach control-plane
+
+compose-observability-up:
+	OBSERVABILITY_PORT=$(OBSERVABILITY_PORT) PROMETHEUS_PORT=$(PROMETHEUS_PORT) docker compose --profile observability up --build --detach
+
+compose-smoke:
+	@set -eu; \
+	trap 'docker compose --profile observability down --volumes --remove-orphans >/dev/null 2>&1 || true' EXIT; \
+	docker compose --profile observability down --volumes --remove-orphans >/dev/null 2>&1 || true; \
+	OBSERVABILITY_PORT=$(OBSERVABILITY_PORT) docker compose up --build --detach control-plane; \
+	for attempt in $$(seq 1 30); do \
+		if PYTHONPATH=src $(PYTHON) -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$(OBSERVABILITY_PORT)/health/ready', timeout=1).read()" 2>/dev/null; then break; fi; \
+		if [ "$$attempt" -eq 30 ]; then docker compose logs control-plane; exit 1; fi; \
+		sleep 1; \
+	done; \
+	PYTHONPATH=src $(PYTHON) tools/smoke_observability_api.py --base-url http://127.0.0.1:$(OBSERVABILITY_PORT) --output .local
+
+compose-down:
+	docker compose --profile observability down --volumes --remove-orphans
 
 ci-verify:
 	PYTHONPATH=src python3 -m compileall -q src tests

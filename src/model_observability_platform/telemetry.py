@@ -1,18 +1,27 @@
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from .io import write_csv
 
-
 FEATURES = ["age", "income", "debt_ratio", "utilization", "delinquencies"]
 
 
-def generate_window(path: str | Path, *, window: str, rows: int = 500, seed: int = 42, drift: bool = False, errors: bool = False) -> Path:
+def generate_records(
+    *,
+    window: str,
+    rows: int = 500,
+    seed: int = 42,
+    drift: bool = False,
+    errors: bool = False,
+    started_at: datetime | None = None,
+) -> list[dict]:
     rng = random.Random(seed + (11 if drift else 0) + (19 if errors else 0))
-    started = datetime(2026, 7, 7, 12, 0, tzinfo=timezone.utc)
+    started = started_at or datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+    if started.tzinfo is None:
+        raise ValueError("telemetry window start must be timezone-aware")
     records = []
     for idx in range(rows):
         age = max(18, int(rng.gauss(42 if not drift else 35, 11)))
@@ -20,7 +29,17 @@ def generate_window(path: str | Path, *, window: str, rows: int = 500, seed: int
         debt_ratio = min(max(rng.gauss(0.38 if not drift else 0.62, 0.16), 0.02), 1.7)
         utilization = min(max(rng.gauss(0.44 if not drift else 0.72, 0.22), 0.0), 1.4)
         delinquencies = max(0, int(rng.gauss(0.5 if not drift else 1.5, 0.9)))
-        score = min(max(0.08 + debt_ratio * 0.34 + utilization * 0.28 + delinquencies * 0.09 - income / 500000, 0), 0.99)
+        score = min(
+            max(
+                0.08
+                + debt_ratio * 0.34
+                + utilization * 0.28
+                + delinquencies * 0.09
+                - income / 500000,
+                0,
+            ),
+            0.99,
+        )
         if drift:
             score = min(score + 0.12, 0.99)
         status = "error" if errors and rng.random() < 0.035 else "success"
@@ -42,4 +61,25 @@ def generate_window(path: str | Path, *, window: str, rows: int = 500, seed: int
                 "delinquencies": delinquencies,
             }
         )
+    return records
+
+
+def generate_window(
+    path: str | Path,
+    *,
+    window: str,
+    rows: int = 500,
+    seed: int = 42,
+    drift: bool = False,
+    errors: bool = False,
+    started_at: datetime | None = None,
+) -> Path:
+    records = generate_records(
+        window=window,
+        rows=rows,
+        seed=seed,
+        drift=drift,
+        errors=errors,
+        started_at=started_at,
+    )
     return write_csv(path, records)

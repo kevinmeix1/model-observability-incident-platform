@@ -1,13 +1,25 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import math
+from datetime import UTC, datetime
 
 from .telemetry import FEATURES
 
+DEFAULT_EVALUATION_TIME = datetime(2026, 7, 7, 13, 30, tzinfo=UTC)
+
+
+def numeric_values(rows: list[dict], column: str) -> list[float]:
+    values = []
+    for row in rows:
+        value = row.get(column)
+        if value in {"", None}:
+            continue
+        values.append(float(value))
+    return values
+
 
 def mean(rows: list[dict], column: str) -> float:
-    values = [float(row[column]) for row in rows if row.get(column) not in {"", None}]
+    values = numeric_values(rows, column)
     return sum(values) / max(len(values), 1)
 
 
@@ -23,10 +35,13 @@ def psi(reference_values: list[float], current_values: list[float], buckets: int
     if not reference_values or not current_values:
         return 0.0
     ordered = sorted(reference_values)
-    cuts = [ordered[min(int(len(ordered) * idx / buckets), len(ordered) - 1)] for idx in range(1, buckets)]
+    cuts = [
+        ordered[min(int(len(ordered) * idx / buckets), len(ordered) - 1)]
+        for idx in range(1, buckets)
+    ]
     boundaries = [-math.inf, *cuts, math.inf]
     value = 0.0
-    for left, right in zip(boundaries, boundaries[1:]):
+    for left, right in zip(boundaries, boundaries[1:], strict=False):
         ref_count = sum(1 for item in reference_values if left <= item < right)
         cur_count = sum(1 for item in current_values if left <= item < right)
         ref_share = max(ref_count / len(reference_values), 0.0001)
@@ -35,24 +50,47 @@ def psi(reference_values: list[float], current_values: list[float], buckets: int
     return round(value, 6)
 
 
-def run_checks(reference: list[dict], current: list[dict]) -> dict:
+def run_checks(
+    reference: list[dict],
+    current: list[dict],
+    *,
+    now: datetime | None = None,
+) -> dict:
+    if not reference or not current:
+        raise ValueError("reference and current telemetry windows cannot be empty")
+    now = now or DEFAULT_EVALUATION_TIME
+    if now.tzinfo is None:
+        raise ValueError("evaluation time must be timezone-aware")
     checks = []
     ref_means = {feature: round(mean(reference, feature), 4) for feature in FEATURES}
     cur_means = {feature: round(mean(current, feature), 4) for feature in FEATURES}
     deltas = {feature: round(cur_means[feature] - ref_means[feature], 4) for feature in FEATURES}
-    drift_thresholds = {"age": 4.0, "income": 12000.0, "debt_ratio": 0.12, "utilization": 0.14, "delinquencies": 0.45}
+    drift_thresholds = {
+        "age": 4.0,
+        "income": 12000.0,
+        "debt_ratio": 0.12,
+        "utilization": 0.14,
+        "delinquencies": 0.45,
+    }
     drifted = {feature: abs(deltas[feature]) > drift_thresholds[feature] for feature in FEATURES}
     psi_scores = {
-        feature: psi([float(row[feature]) for row in reference], [float(row[feature]) for row in current])
+        feature: psi(
+            numeric_values(reference, feature),
+            numeric_values(current, feature),
+        )
         for feature in FEATURES
     }
     psi_failed = {feature: score >= 0.2 for feature, score in psi_scores.items()}
-    failed_features = sorted({feature for feature in FEATURES if drifted[feature] or psi_failed[feature]})
+    failed_features = sorted(
+        {feature for feature in FEATURES if drifted[feature] or psi_failed[feature]}
+    )
     checks.append(
         {
             "name": "feature_drift",
             "passed": not any(drifted.values()) and not any(psi_failed.values()),
-            "severity": "high" if sum(drifted.values()) + sum(psi_failed.values()) >= 3 else "medium",
+            "severity": "high"
+            if sum(drifted.values()) + sum(psi_failed.values()) >= 3
+            else "medium",
             "observed": {"mean_delta": deltas, "psi": psi_scores},
             "failed_features": failed_features,
         }
@@ -69,23 +107,71 @@ def run_checks(reference: list[dict], current: list[dict]) -> dict:
             "threshold": 0.08,
         }
     )
-    latencies = [float(row["latency_ms"]) for row in current]
+    latencies = numeric_values(current, "latency_ms")
     p95 = percentile(latencies, 0.95)
     p99 = percentile(latencies, 0.99)
-    checks.append({"name": "latency_slo", "passed": p95 <= 85.0, "severity": "medium", "observed": p95, "p99": p99, "threshold": 85.0})
-    error_rate = round(sum(1 for row in current if row.get("status") != "success") / max(len(current), 1), 4)
-    checks.append({"name": "error_rate", "passed": error_rate <= 0.02, "severity": "high", "observed": error_rate, "threshold": 0.02})
+    checks.append(
+        {
+            "name": "latency_slo",
+            "passed": p95 <= 85.0,
+            "severity": "medium",
+            "observed": p95,
+            "p99": p99,
+            "threshold": 85.0,
+        }
+    )
+    error_rate = round(
+        sum(1 for row in current if row.get("status") != "success") / max(len(current), 1), 4
+    )
+    checks.append(
+        {
+            "name": "error_rate",
+            "passed": error_rate <= 0.02,
+            "severity": "high",
+            "observed": error_rate,
+            "threshold": 0.02,
+        }
+    )
     null_count = sum(1 for row in current for feature in FEATURES if row.get(feature) in {"", None})
-    checks.append({"name": "null_rate", "passed": null_count == 0, "severity": "medium", "observed": null_count, "threshold": 0})
-    latest_timestamp = max(datetime.fromisoformat(row["timestamp"]) for row in current)
-    freshness_minutes = round((datetime(2026, 7, 7, 13, 30, tzinfo=timezone.utc) - latest_timestamp).total_seconds() / 60, 2)
-    checks.append({"name": "freshness", "passed": freshness_minutes <= 20.0, "severity": "medium", "observed": freshness_minutes, "threshold": 20.0})
+    checks.append(
+        {
+            "name": "null_rate",
+            "passed": null_count == 0,
+            "severity": "medium",
+            "observed": null_count,
+            "threshold": 0,
+        }
+    )
+    timestamps = [
+        datetime.fromisoformat(str(row["timestamp"]).replace("Z", "+00:00"))
+        for row in current
+        if row.get("timestamp")
+    ]
+    latest_timestamp = max(timestamps) if timestamps else datetime.min.replace(tzinfo=UTC)
+    if latest_timestamp.tzinfo is None:
+        latest_timestamp = latest_timestamp.replace(tzinfo=UTC)
+    freshness_minutes = round(
+        max((now - latest_timestamp).total_seconds() / 60, 0.0),
+        2,
+    )
+    checks.append(
+        {
+            "name": "freshness",
+            "passed": freshness_minutes <= 20.0,
+            "severity": "medium",
+            "observed": freshness_minutes,
+            "threshold": 20.0,
+        }
+    )
     return {
         "passed": all(check["passed"] for check in checks),
         "checks": checks,
         "reference_means": ref_means,
         "current_means": cur_means,
         "psi": psi_scores,
+        "reference_row_count": len(reference),
+        "current_row_count": len(current),
+        "evaluated_at": now.astimezone(UTC).isoformat(),
     }
 
 

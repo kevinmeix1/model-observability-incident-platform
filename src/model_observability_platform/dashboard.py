@@ -81,10 +81,20 @@ def rows(items: list[dict], columns: list[str]) -> str:
     return "\n".join(rendered)
 
 
-def render_dashboard(output_path: str | Path, *, report: dict, incident_summary: dict, reliability_plan: dict | None = None) -> Path:
+def render_dashboard(
+    output_path: str | Path,
+    *,
+    report: dict,
+    incident_summary: dict,
+    reliability_plan: dict | None = None,
+    runtime_contract: dict | None = None,
+) -> Path:
     reliability_plan = reliability_plan or {}
+    runtime_contract = runtime_contract or {}
     reliability_action = str(reliability_plan.get("recommended_action", "not planned")).replace("_", " ")
     impacted_assets = [str(asset) for asset in reliability_plan.get("impacted_assets", [])]
+    runtime_checks = runtime_contract.get("checks", {})
+    runtime_summary = runtime_contract.get("runtime", {}).get("summary", {})
     check_rows = [
         {
             "check": LABELS.get(check["name"], check["name"]),
@@ -134,6 +144,7 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
         .metric strong {{ display:block; font-size:24px; line-height:1.2; overflow-wrap:anywhere; }}
         .metric .badge,.metric .sev {{ width:auto; max-width:max-content; }}
         .layout {{ display:grid; grid-template-columns:minmax(0,1fr) minmax(380px,.43fr); gap:16px; align-items:start; }}
+        .layout > div,.panel {{ min-width:0; }}
         .panel {{ padding:16px; margin-top:16px; }}
         table {{ width:100%; table-layout:fixed; border-collapse:collapse; }}
         th,td {{ border-bottom:1px solid #e8edf3; padding:11px 12px; text-align:left; font-size:14px; overflow-wrap:anywhere; vertical-align:top; }}
@@ -157,12 +168,14 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
         .low {{ color:#166534; background:#dcfce7; }}
         .chip {{ display:inline-block; margin:0 5px 5px 0; padding:4px 8px; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:12px; font-weight:800; white-space:nowrap; }}
         .chip.muted {{ background:#f1f5f9; color:#475569; }}
-        .summary {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }}
-        .summary div {{ border:1px solid #e3e9f0; border-radius:6px; padding:12px; min-height:74px; }}
-        .summary span {{ display:block; color:#64748b; font-size:12px; margin-bottom:8px; }}
-        .summary strong {{ display:block; font-size:18px; overflow-wrap:anywhere; }}
+        .facts {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:18px; }}
+        .facts div {{ padding:11px 0; min-height:66px; border-bottom:1px solid #e8edf3; }}
+        .facts span {{ display:block; color:#64748b; font-size:12px; margin-bottom:7px; }}
+        .facts strong {{ display:block; font-size:16px; overflow-wrap:anywhere; }}
+        .table-wrap {{ width:100%; max-width:100%; min-width:0; overflow-x:auto; }}
+        .table-wrap table {{ min-width:680px; }}
         .nowrap {{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }}
-        @media (max-width:900px) {{ header {{ padding:22px 18px; }} main {{ padding:18px; }} .layout {{ grid-template-columns:1fr; }} }}
+        @media (max-width:900px) {{ header {{ padding:22px 18px; }} main {{ padding:18px; }} .layout {{ grid-template-columns:1fr; }} .facts {{ grid-template-columns:1fr; }} }}
       </style>
     </head>
     <body>
@@ -176,22 +189,34 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
           <div class="metric"><span>Open incidents</span><strong>{esc(incident_summary.get('open_count'))}</strong></div>
           <div class="metric"><span>Top severity</span><strong>{severity_badge(incident_summary.get('severity', 'low'))}</strong></div>
           <div class="metric"><span>New incidents</span><strong>{esc(incident_summary.get('created_count'))}</strong></div>
+          <div class="metric"><span>API runtime contract</span><strong>{badge(bool(runtime_contract.get('passed', False)))}</strong></div>
         </section>
         <section class="layout">
           <div>
             <div class="panel">
               <h2>Health Checks</h2>
-              <table class="checks"><colgroup><col><col><col><col><col></colgroup><tr><th>Check</th><th>Status</th><th>Severity</th><th>Observed</th><th>Limit</th></tr>{rows(check_rows, ['check', 'status', 'severity', 'observed', 'threshold'])}</table>
+              <div class="table-wrap"><table class="checks"><colgroup><col><col><col><col><col></colgroup><tr><th>Check</th><th>Status</th><th>Severity</th><th>Observed</th><th>Limit</th></tr>{rows(check_rows, ['check', 'status', 'severity', 'observed', 'threshold'])}</table></div>
             </div>
             <div class="panel">
               <h2>Open Incidents</h2>
-              <table class="incidents"><colgroup><col><col><col><col><col></colgroup><tr><th>Incident</th><th>Check</th><th>Severity</th><th>Root Cause</th><th>State</th></tr>{rows(incident_rows, ['incident', 'check', 'severity', 'root', 'status'])}</table>
+              <div class="table-wrap"><table class="incidents"><colgroup><col><col><col><col><col></colgroup><tr><th>Incident</th><th>Check</th><th>Severity</th><th>Root Cause</th><th>State</th></tr>{rows(incident_rows, ['incident', 'check', 'severity', 'root', 'status'])}</table></div>
             </div>
           </div>
           <div>
             <div class="panel">
+              <h2>Executable Runtime</h2>
+              <div class="facts">
+                <div><span>State backend</span><strong>{esc(runtime_contract.get('runtime', {}).get('state_backend', 'not exercised'))}</strong></div>
+                <div><span>Durable evaluations</span><strong>{esc(runtime_summary.get('evaluation_count', 0))}</strong></div>
+                <div><span>Evaluation replay</span><strong>{badge(bool(runtime_checks.get('evaluation_replay', False)))}</strong></div>
+                <div><span>Lifecycle replay</span><strong>{badge(bool(runtime_checks.get('transition_replay', False)))}</strong></div>
+                <div><span>Trace propagation</span><strong>{badge(bool(runtime_checks.get('stable_trace_header', False)))}</strong></div>
+                <div><span>Metric cardinality</span><strong>{badge(bool(runtime_checks.get('low_cardinality_metrics', False)))}</strong></div>
+              </div>
+            </div>
+            <div class="panel">
               <h2>Reliability Control Plane</h2>
-              <div class="summary">
+              <div class="facts">
                 <div><span>Recommended action</span><strong>{esc(reliability_action)}</strong></div>
                 <div><span>Error burn rate</span><strong>{esc(reliability_plan.get('error_budget_burn_rate', 'n/a'))}</strong></div>
                 <div><span>Owner</span><strong>{esc(reliability_plan.get('routing', {}).get('owner', 'n/a'))}</strong></div>
@@ -200,14 +225,14 @@ def render_dashboard(output_path: str | Path, *, report: dict, incident_summary:
             </div>
             <div class="panel">
               <h2>Root Cause Summary</h2>
-              <div class="summary">
+              <div class="facts">
                 <div><span>Primary root cause</span><strong>{esc(root_cause_summary(incident_summary.get('incidents', [{}])[-1].get('root_cause', 'none')))}</strong></div>
                 <div><span>Incident status</span><strong>{esc('open' if incident_summary.get('open_count', 0) else 'clear')}</strong></div>
               </div>
             </div>
             <div class="panel">
               <h2>Feature Means</h2>
-              <table><tr><th>Feature</th><th>Reference</th><th>Current</th></tr>{rows(drift_rows, ['feature', 'reference', 'current'])}</table>
+              <div class="table-wrap"><table><tr><th>Feature</th><th>Reference</th><th>Current</th></tr>{rows(drift_rows, ['feature', 'reference', 'current'])}</table></div>
             </div>
           </div>
         </section>

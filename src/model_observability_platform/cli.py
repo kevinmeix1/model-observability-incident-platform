@@ -7,6 +7,7 @@ from pathlib import Path
 from .accelerator_plan import build_accelerator_capacity_plan
 from .admin_access_diagnostics import build_admin_access_diagnostic_plan
 from .advanced_device_sharing import build_advanced_device_sharing_plan
+from .alert_routing_remediation import build_alert_routing_remediation_plan
 from .airflow_stateful_orchestration import build_airflow_stateful_orchestration_plan
 from .artifact_index import render_artifact_index
 from .asset_partitioning import build_asset_partitioning_plan
@@ -125,12 +126,14 @@ def demo(output: str | Path) -> dict:
     constrained_impersonation = build_constrained_impersonation_plan(root)
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
     root_cause_evidence = build_root_cause_evidence_bundle(root)
+    alert_routing = build_alert_routing_remediation_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
         incident_summary=incident_summary,
         reliability_plan=reliability_plan,
         root_cause_evidence=root_cause_evidence,
+        alert_routing=alert_routing,
     )
     supply_chain = build_supply_chain_evidence(
         root,
@@ -198,6 +201,7 @@ def demo(output: str | Path) -> dict:
         "constrained_impersonation": constrained_impersonation,
         "incident_evidence_volume": incident_evidence_volume,
         "root_cause_evidence": root_cause_evidence,
+        "alert_routing": alert_routing,
         "release_admission": release_admission,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
@@ -273,6 +277,7 @@ def render_current_dashboard(output: str | Path) -> dict:
     runtime_path = root / "reports" / "observability_runtime_contract.json"
     notification_path = root / "reports" / "notification_outbox_contract.json"
     root_cause_evidence_path = root / "reports" / "root_cause_evidence_bundle.json"
+    alert_routing_path = root / "reports" / "alert_routing_remediation_plan.json"
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=read_json(required["report"]),
@@ -287,12 +292,14 @@ def render_current_dashboard(output: str | Path) -> dict:
             if root_cause_evidence_path.exists()
             else None
         ),
+        alert_routing=read_json(alert_routing_path) if alert_routing_path.exists() else None,
     )
     return {
         "dashboard": str(dashboard),
         "runtime_contract_included": runtime_path.exists(),
         "notification_contract_included": notification_path.exists(),
         "root_cause_evidence_included": root_cause_evidence_path.exists(),
+        "alert_routing_included": alert_routing_path.exists(),
     }
 
 
@@ -352,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
         "constrained-impersonation",
         "incident-evidence-volumes",
         "root-cause-evidence",
+        "alert-routing-remediation",
         "release-admission",
         "runtime-init",
         "dashboard",
@@ -467,6 +475,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "root-cause-evidence":
         print(json.dumps(build_root_cause_evidence_bundle(args.output), indent=2, sort_keys=True))
+    elif args.command == "alert-routing-remediation":
+        print(json.dumps(build_alert_routing_remediation_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":
         print(json.dumps(build_release_admission_decision(args.output), indent=2, sort_keys=True))
     return 0

@@ -23,6 +23,7 @@ failure behavior can be reviewed without cloud credentials.
 | Incident state | SQLite WAL transaction with incidents, evaluations, and immutable events | Restart-safe HTTP idempotency smoke | Postgres with retention and HA |
 | Incident lifecycle | Open, acknowledge, resolve, reopen, and recovery hysteresis | Optimistic version and transition-key tests | On-call authorization and ticket integration |
 | RCA evidence | SLO burn, lineage facets, feature-flag context, and confidence scoring | Dashboard evidence panel plus `root_cause_evidence_bundle.json` | Incident-review evidence store and OpenLineage backend |
+| Alert routing and remediation | Alertmanager-style grouping, inhibition, escalation, and approval gates | Dashboard panel plus `alert_routing_remediation_plan.json` | Alertmanager, PagerDuty, Slack, Argo Rollouts, and approval workflow |
 | Interactive incident lab | Browser-tested degradation, acknowledgement, and two-window recovery | Live FastAPI state plus a draining worker | Authenticated operator console and escalation service |
 | Notification delivery | Atomic CloudEvents outbox, ordered leases, retries, and DLQ | Crash recovery and idempotent receiver contract | Postgres relay plus Kafka/SQS and ticket routing |
 | Metrics | Dedicated Prometheus registry with bounded labels | `/metrics` is checked over HTTP | Managed Prometheus and recording rules |
@@ -187,6 +188,14 @@ facets, rollout feature-flag context, confidence, and missing evidence to
 `reports/root_cause_evidence_bundle.json` and the dashboard.
 
 ![Root-cause evidence dashboard panel](docs/screenshots/dashboard-root-cause-evidence.png)
+
+### Alert routing and guarded remediation
+
+The alert routing plan models Alertmanager grouping, inhibition, escalation, and receiver routing before the transactional outbox sees an incident event. It also classifies remediation actions by blast radius: rollout freezes and diagnostic fanout are automatic, while resource-increasing diagnostic scaling requires human approval. See [alert routing and guarded remediation](docs/alert-routing-remediation.md).
+
+![Alert routing and remediation dashboard panel](docs/screenshots/dashboard-alert-routing-remediation.png)
+
+Mobile capture: [dashboard-alert-routing-remediation-mobile.png](docs/screenshots/dashboard-alert-routing-remediation-mobile.png)
 
 ### Transactional notifications
 

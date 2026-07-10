@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-mlops-webhooks
+  namespace: mlops-observability
+type: Opaque
+stringData:
+  pagerduty-routing-key: replace-me
+  incident-webhook-url: http://model-observability-api.mlops-observability.svc.cluster.local/v1/alerts
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: mlops-alert-routing
+  namespace: mlops-observability
+  labels:
+    app.kubernetes.io/part-of: model-observability-incident-platform
+spec:
+  route:
+    groupBy: ["domain", "root_cause", "model_version"]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 2h
+    receiver: slack-ml-platform
+    routes:
+      - receiver: pagerduty-ml-platform
+        matchers:
+          - name: severity
+            value: critical
+        continue: true
+      - receiver: incident-webhook
+        matchers:
+          - name: domain
+            value: credit-risk
+        continue: true
+  inhibitRules:
+    - sourceMatch:
+        - name: severity
+          value: critical
+      targetMatch:
+        - name: severity
+          value: medium
+      equal: ["domain", "root_cause", "model_version"]
+    - sourceMatch:
+        - name: alertname
+          value: CreditRiskPredictionDriftHigh
+      targetMatch:
+        - name: alertname
+          value: CreditRiskDashboardStale
+      equal: ["domain", "model_version"]
+  receivers:
+    - name: slack-ml-platform
+      slackConfigs:
+        - channel: "#ml-platform-alerts"
+          title: "{{ .CommonLabels.alertname }}"
+          text: "{{ .CommonAnnotations.summary }}"
+    - name: pagerduty-ml-platform
+      pagerdutyConfigs:
+        - routingKey:
+            name: alertmanager-mlops-webhooks
+            key: pagerduty-routing-key
+          severity: "{{ .CommonLabels.severity }}"
+    - name: incident-webhook
+      webhookConfigs:
+        - urlSecret:
+            name: alertmanager-mlops-webhooks
+            key: incident-webhook-url
+          sendResolved: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mlops-remediation-safety
+  namespace: mlops-observability
+spec:
+  groups:
+    - name: mlops-remediation-safety
+      rules:
+        - alert: AutoRemediationRequiresApproval
+          expr: increase(observability_guarded_remediation_requested_total{requires_human="true"}[5m]) > 0
+          for: 1m
+          labels:
+            severity: high
+            domain: credit-risk
+            root_cause: guarded_resource_mutation
+          annotations:
+            summary: Guarded remediation requested human approval before resource mutation.
+        - alert: AlertInhibitionNotApplied
+          expr: increase(alertmanager_notifications_total{receiver="slack-ml-platform",alertname="CreditRiskDashboardStale"}[15m]) > 0 and on() increase(alertmanager_notifications_total{receiver="pagerduty-ml-platform",alertname="CreditRiskPredictionDriftHigh"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: medium
+            domain: credit-risk
+            root_cause: alert_noise
+          annotations:
+            summary: Dashboard symptom alert was not inhibited while critical prediction drift was active.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-rollouts-observability-notifications
+  namespace: argo-rollouts
+data:
+  trigger.on-analysis-run-failed: |
+    - when: analysisrun.status.phase in ['Error', 'Failed']
+      send: [freeze-rollout-and-open-incident]
+  trigger.on-rollout-paused: |
+    - when: rollout.status.pauseConditions != nil
+      send: [attach-rollout-freeze-evidence]
+  template.freeze-rollout-and-open-incident: |
+    webhook:
+      incident-webhook:
+        method: POST
+        path: /v1/rollout-events
+        body: |
+          {
+            "rollout": "{{ .rollout.metadata.name }}",
+            "namespace": "{{ .rollout.metadata.namespace }}",
+            "action": "freeze_rollout",
+            "reason": "analysis_failed",
+            "requires_human": false
+          }
+  template.attach-rollout-freeze-evidence: |
+    webhook:
+      incident-webhook:
+        method: POST
+        path: /v1/rollout-events
+        body: |
+          {
+            "rollout": "{{ .rollout.metadata.name }}",
+            "namespace": "{{ .rollout.metadata.namespace }}",
+            "action": "attach_evidence",
+            "reason": "rollout_paused"
+          }

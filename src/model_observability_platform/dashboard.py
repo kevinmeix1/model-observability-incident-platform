@@ -91,11 +91,13 @@ def render_dashboard(
     runtime_contract: dict | None = None,
     notification_contract: dict | None = None,
     root_cause_evidence: dict | None = None,
+    alert_routing: dict | None = None,
 ) -> Path:
     reliability_plan = reliability_plan or {}
     runtime_contract = runtime_contract or {}
     notification_contract = notification_contract or {}
     root_cause_evidence = root_cause_evidence or {}
+    alert_routing = alert_routing or {}
     reliability_action = str(reliability_plan.get("recommended_action", "not planned")).replace("_", " ")
     impacted_assets = [str(asset) for asset in reliability_plan.get("impacted_assets", [])]
     runtime_checks = runtime_contract.get("checks", {})
@@ -105,6 +107,10 @@ def render_dashboard(
     rca_evidence = root_cause_evidence.get("evidence", [])
     rca_facets = root_cause_evidence.get("lineage_facets", [])
     rca_flags = root_cause_evidence.get("feature_flag_context", [])
+    alertmanager = alert_routing.get("alertmanager", {})
+    alert_groups = alertmanager.get("groups", [])
+    remediations = alert_routing.get("remediations", [])
+    lineage_impact = alert_routing.get("lineage_impact", {})
     check_rows = [
         {
             "check": LABELS.get(check["name"], check["name"]),
@@ -241,7 +247,7 @@ def render_dashboard(
         .live-incident strong {{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
         .mini-action {{ border:1px solid #cbd5e1; border-radius:5px; padding:5px 7px; background:white; color:#334155; font:inherit; font-size:10px; font-weight:800; cursor:pointer; }}
         @media (max-width:900px) {{ header {{ padding:22px 18px; }} main {{ padding:18px; }} .layout,.lower-grid,.response-grid {{ grid-template-columns:1fr; }} .facts {{ grid-template-columns:1fr; }} }}
-        @media (max-width:620px) {{ .lab-heading {{ flex-direction:column; }} .api-status {{ width:100%; }} .control-row {{ grid-template-columns:106px minmax(0,1fr) 64px; }} .lab-kpis {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} .lab-kpis div:nth-child(2) {{ border-right:0; }} .lab-kpis div:nth-child(-n+2) {{ border-bottom:1px solid #e4e9f0; }} .event-rail {{ grid-template-columns:1fr; }} .event-step {{ border-right:0; }} .live-incident {{ grid-template-columns:minmax(0,1fr) 70px 72px; }} .live-incident .mini-action {{ grid-column:1 / -1; }} }}
+        @media (max-width:620px) {{ .lab-heading {{ flex-direction:column; }} .api-status {{ width:100%; }} .control-row {{ grid-template-columns:106px minmax(0,1fr) 64px; }} .lab-kpis {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} .lab-kpis div:nth-child(2) {{ border-right:0; }} .lab-kpis div:nth-child(-n+2) {{ border-bottom:1px solid #e4e9f0; }} .event-rail {{ grid-template-columns:1fr; }} .event-step {{ border-right:0; }} .live-incident {{ grid-template-columns:minmax(0,1fr) 70px 72px; }} .live-incident .mini-action {{ grid-column:1 / -1; }} .table-wrap table {{ min-width:0; }} th,td {{ padding:8px 7px; font-size:11px; }} .checks col:nth-child(1),.incidents col:nth-child(2) {{ width:24%; }} .checks col:nth-child(2),.checks col:nth-child(3),.incidents col:nth-child(3),.incidents col:nth-child(5) {{ width:15%; }} .checks col:nth-child(4),.incidents col:nth-child(4) {{ width:31%; }} .checks col:nth-child(5),.incidents col:nth-child(1) {{ width:15%; }} }}
       </style>
     </head>
     <body>
@@ -328,6 +334,17 @@ def render_dashboard(
                 <div><span>Stale worker fencing</span><strong>{badge(bool(notification_checks.get('stale_worker_rejected', False)))}</strong></div>
                 <div><span>Per-incident ordering</span><strong>{badge(bool(notification_checks.get('ordered_delivery', False)))}</strong></div>
                 <div><span>Dead-letter path</span><strong>{badge(bool(notification_checks.get('dead_letter_terminal_state', False)))}</strong></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h2>Alert Routing And Remediation</h2>
+              <div class="facts">
+                <div><span>Routing readiness</span><strong>{badge(bool(alert_routing.get('passed', False)))}</strong></div>
+                <div><span>Alert groups</span><strong>{esc(len(alert_groups))}</strong></div>
+                <div><span>Inhibited alerts</span><strong>{esc(len(alertmanager.get('inhibited_alerts', [])))}</strong></div>
+                <div><span>Human approval gates</span><strong>{esc(sum(1 for item in remediations if item.get('requires_human')))}</strong></div>
+                <div><span>Lineage facet</span><strong>{compact_text(lineage_impact.get('facet', 'not planned'))}</strong></div>
+                <div><span>Impacted assets</span><strong>{asset_chips(lineage_impact.get('impacted_assets', []))}</strong></div>
               </div>
             </div>
           </div>

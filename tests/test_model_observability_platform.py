@@ -7,6 +7,7 @@ from pathlib import Path
 from model_observability_platform.accelerator_plan import build_accelerator_capacity_plan
 from model_observability_platform.admin_access_diagnostics import build_admin_access_diagnostic_plan
 from model_observability_platform.advanced_device_sharing import build_advanced_device_sharing_plan
+from model_observability_platform.alert_routing_remediation import build_alert_routing_remediation_plan
 from model_observability_platform.airflow_stateful_orchestration import build_airflow_stateful_orchestration_plan
 from model_observability_platform.asset_partitioning import build_asset_partitioning_plan
 from model_observability_platform.chaos import run_chaos_drill
@@ -348,7 +349,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             "concurrency",
         ]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "root_cause_evidence_bundle.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "root_cause_evidence_bundle.json", "alert_routing_remediation_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
@@ -1008,6 +1009,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("dynamic_task_mapping", names)
             self.assertIn("kueue_admission", names)
             self.assertIn("semantic_telemetry_contract", names)
+            self.assertIn("alert_routing_guarded_remediation", names)
             self.assertIn("airflow_deadline_alerts", names)
             self.assertIn("opencost_finops", names)
             self.assertIn("kueue_elastic_workloads", names)
@@ -1255,6 +1257,51 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("incidentRootCauseFacet", {facet["name"] for facet in bundle["lineage_facets"]})
             self.assertIn("canary_route_weight", {flag["key"] for flag in bundle["feature_flag_context"]})
             self.assertTrue((root / "reports" / "root_cause_evidence_bundle.json").exists())
+
+    def test_alert_routing_remediation_plan_and_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "alert-routing-remediation.yaml").read_text(
+            encoding="utf-8"
+        )
+        docs = (repo / "docs" / "alert-routing-remediation.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            plan = build_alert_routing_remediation_plan(root)
+            dashboard = (root / "reports" / "model_observability_dashboard.html").read_text(
+                encoding="utf-8"
+            )
+            index = (root / "reports" / "index.html").read_text(encoding="utf-8")
+
+            self.assertTrue(result["alert_routing"]["passed"])
+            self.assertTrue(plan["passed"])
+            self.assertEqual(
+                plan["recommended_action"],
+                "enable_alert_routing_and_guarded_remediation",
+            )
+            self.assertGreaterEqual(len(plan["alertmanager"]["inhibited_alerts"]), 1)
+            self.assertTrue(any(item["requires_human"] for item in plan["remediations"]))
+            self.assertEqual(plan["lineage_impact"]["facet"], "columnLineage")
+            self.assertTrue((root / "reports" / "alert_routing_remediation_plan.json").exists())
+            self.assertIn("Alert Routing And Remediation", dashboard)
+            self.assertIn("alert_routing_remediation_plan.json", index)
+        for expected in [
+            "AlertmanagerConfig",
+            "inhibitRules",
+            "pagerduty-ml-platform",
+            "incident-webhook",
+            "freeze-rollout-and-open-incident",
+            "AutoRemediationRequiresApproval",
+        ]:
+            self.assertIn(expected, manifest)
+        for expected in [
+            "Alertmanager",
+            "inhibition",
+            "Argo Rollouts",
+            "columnLineage",
+            "human approval",
+        ]:
+            self.assertIn(expected, docs)
 
     def test_compound_root_cause_is_classified(self) -> None:
         failed = [

@@ -6,31 +6,38 @@ AUDIO="${2:-.local/demo/model-observability-judge-demo.mp3}"
 OUTPUT="${3:-docs/demo/model-observability-judge-demo.mp4}"
 SUBTITLES="${4:-.local/demo/model-observability-judge-demo.srt}"
 
+screenshots=(
+  "dashboard.png"
+  "dashboard-recovery.png"
+  "dashboard-delivery.png"
+  "dashboard-root-cause-evidence.png"
+  "dashboard-alert-routing-triage.png"
+  "dashboard-mobile.png"
+)
+durations=(60 62 48 44 48 36)
+
 command -v ffmpeg >/dev/null || { echo "ffmpeg is required" >&2; exit 1; }
 test -f "$AUDIO" || { echo "Missing narration: run make demo-voice" >&2; exit 1; }
 test -f "$SUBTITLES" || { echo "Missing subtitles: run make demo-voice" >&2; exit 1; }
-for screenshot in dashboard.png dashboard-recovery.png dashboard-delivery.png dashboard-mobile.png; do
+for screenshot in "${screenshots[@]}"; do
   test -f "$SCREENSHOT_DIR/$screenshot" || { echo "Missing screenshot: $screenshot" >&2; exit 1; }
 done
 
 mkdir -p "$(dirname "$OUTPUT")"
-ffmpeg -y \
-  -loop 1 -t 69 -i "$SCREENSHOT_DIR/dashboard.png" \
-  -loop 1 -t 77 -i "$SCREENSHOT_DIR/dashboard-recovery.png" \
-  -loop 1 -t 61 -i "$SCREENSHOT_DIR/dashboard-delivery.png" \
-  -loop 1 -t 51 -i "$SCREENSHOT_DIR/dashboard-mobile.png" \
-  -i "$AUDIO" \
-  -i "$SUBTITLES" \
-  -filter_complex \
-    "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#f5f7fa,fps=30,format=yuv420p[v0]; \
-     [1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#f5f7fa,fps=30,format=yuv420p[v1]; \
-     [2:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#f5f7fa,fps=30,format=yuv420p[v2]; \
-     [3:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#f5f7fa,fps=30,format=yuv420p[v3]; \
-     [v0][v1]xfade=transition=fade:duration=1:offset=68[x01]; \
-     [x01][v2]xfade=transition=fade:duration=1:offset=144[x012]; \
-     [x012][v3]xfade=transition=fade:duration=1:offset=204,format=yuv420p[video]; \
-     [4:a]loudnorm=I=-16:TP=-1.5:LRA=11[audio]" \
-  -map "[video]" -map "[audio]" -map 5:s:0 \
+inputs=()
+filter=""
+concat_inputs=""
+for index in "${!screenshots[@]}"; do
+  inputs+=(-loop 1 -t "${durations[$index]}" -i "$SCREENSHOT_DIR/${screenshots[$index]}")
+  filter+="[$index:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#f5f7fa,setsar=1,fps=30,format=yuv420p[v$index]; "
+  concat_inputs+="[v$index]"
+done
+audio_index=${#screenshots[@]}
+subtitle_index=$((audio_index + 1))
+
+ffmpeg -y "${inputs[@]}" -i "$AUDIO" -i "$SUBTITLES" \
+  -filter_complex "${filter}${concat_inputs}concat=n=${#screenshots[@]}:v=1:a=0[video]; [${audio_index}:a]loudnorm=I=-16:TP=-1.5:LRA=11[audio]" \
+  -map "[video]" -map "[audio]" -map "${subtitle_index}:s:0" \
   -c:v libx264 -profile:v high -crf 20 \
   -c:a aac -b:a 160k -ar 48000 \
   -c:s mov_text -metadata:s:s:0 language=eng \

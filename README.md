@@ -280,6 +280,7 @@ Start with these documents:
 - [Runtime incident recovery runbook](docs/runbooks/runtime-incident-recovery.md)
 - [Airflow 3.3 stateful orchestration](docs/airflow-stateful-orchestration.md)
 - [AI workload telemetry readiness](docs/ai-workload-telemetry.md)
+- [Operational readiness review](docs/operational-readiness-review.md)
 - [Semantic telemetry contract](docs/semantic-telemetry.md)
 - [Release admission control](docs/release-admission-control.md)
 - [Kubernetes and Airflow robustness](docs/kubernetes-airflow-robustness.md)

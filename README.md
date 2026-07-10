@@ -15,6 +15,8 @@ failure behavior can be reviewed without cloud credentials.
 
 [Watch the narrated judge demo](docs/demo/model-observability-judge-demo.mp4) | [Follow the live demo script](docs/judge-demo.md)
 
+![Judge evidence deck](docs/screenshots/dashboard-evidence-deck.png)
+
 ## What Is Executable
 
 | Capability | Local evidence | Integrated evidence | Production mapping |

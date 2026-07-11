@@ -15,6 +15,10 @@ failure behavior can be reviewed without cloud credentials.
 
 [Watch the narrated judge demo](docs/demo/model-observability-judge-demo.mp4) | [Follow the live demo script](docs/judge-demo.md)
 
+For a study-oriented walkthrough with the full architecture diagram,
+step-by-step screenshot guide, code reading order, and interview explanations,
+start with [the project study guide](docs/study-guide.md).
+
 ![Judge evidence deck](docs/screenshots/dashboard-evidence-deck.png)
 
 ![Judge demo theater](docs/screenshots/dashboard-demo-theater.png)

@@ -51,6 +51,7 @@ from model_observability_platform.pod_resource_envelopes import build_pod_resour
 from model_observability_platform.provisioning_admission import build_provisioning_admission_plan
 from model_observability_platform.queue_simulator import build_queue_simulation
 from model_observability_platform.release_admission import build_release_admission_decision, evaluate_release_admission
+from model_observability_platform.reliability_signal_mesh import build_reliability_signal_mesh
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_health_status import build_resource_health_status_plan
 from model_observability_platform.root_cause_evidence import build_root_cause_evidence_bundle
@@ -367,7 +368,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             "concurrency",
         ]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "operational_readiness_review.json", "judge_demo_cockpit.html", "judge_demo_cockpit_manifest.json", "operator_drill_lab.html", "operator_drill_report.json", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "root_cause_evidence_bundle.json", "alert_routing_remediation_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "operational_readiness_review.json", "judge_demo_cockpit.html", "judge_demo_cockpit_manifest.json", "operator_drill_lab.html", "operator_drill_report.json", "reliability_signal_mesh.html", "reliability_signal_mesh.json", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "root_cause_evidence_bundle.json", "alert_routing_remediation_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
 
     def test_operational_readiness_review_aggregates_incident_evidence(self) -> None:
@@ -414,6 +415,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("slo.burn_rate", drill["telemetry_contract"])
             self.assertIn("Operator Drill Lab", html)
             self.assertTrue((root / "reports" / "operator_drill_report.json").exists())
+
+    def test_reliability_signal_mesh_connects_incident_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            mesh = build_reliability_signal_mesh(
+                root,
+                project_name="Model Observability Incident Platform",
+                domain="incident mesh",
+                primary_dashboard="model_observability_dashboard.html",
+            )
+            html = (root / "reports" / "reliability_signal_mesh.html").read_text(encoding="utf-8")
+            self.assertEqual(result["reliability_signal_mesh"]["status"], "ready")
+            self.assertEqual(mesh["readiness_score"], 100.0)
+            self.assertIn("release.decision", mesh["semantic_contract"])
+            self.assertGreaterEqual(mesh["operator_readiness"], 80.0)
+            self.assertIn("Reliability Signal Mesh", html)
+            self.assertTrue((root / "reports" / "reliability_signal_mesh.json").exists())
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -1260,6 +1279,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "dag_bundle_versioning_plan.json").exists())
             self.assertTrue((root / "reports" / "asset_partitioning_plan.json").exists())
             self.assertTrue((root / "reports" / "airflow_stateful_orchestration_plan.json").exists())
+            self.assertTrue((root / "reports" / "reliability_signal_mesh.json").exists())
             self.assertTrue((root / "reports" / "multi_team_readiness_plan.json").exists())
             self.assertTrue((root / "reports" / "event_driven_assets_plan.json").exists())
             self.assertTrue((root / "reports" / "pod_resource_envelope_plan.json").exists())

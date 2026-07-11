@@ -21,7 +21,7 @@ from .constrained_impersonation import build_constrained_impersonation_plan
 from .cost_observability import build_cost_observability_report
 from .dag_bundle_versioning import build_dag_bundle_versioning_plan
 from .dashboard import render_dashboard
-from .demo_cockpit import build_judge_demo_cockpit
+from .demo_cockpit import build_judge_demo_cockpit, build_operator_drill_lab
 from .deadline_alerts import build_deadline_alert_plan
 from .device_allocation import build_device_allocation_plan
 from .disaster_recovery import build_disaster_recovery_plan
@@ -154,6 +154,13 @@ def demo(output: str | Path) -> dict:
         primary_dashboard="model_observability_dashboard.html",
         demo_video="../../docs/demo/model-observability-judge-demo.mp4",
     )
+    operator_drill = build_operator_drill_lab(
+        root,
+        project_name="Model Observability Incident Platform",
+        scenario="Compound feature drift and serving degradation require incident freeze and root-cause evidence",
+        primary_dashboard="model_observability_dashboard.html",
+        runbook="../../docs/runbook.md",
+    )
     artifact_index = render_artifact_index(
         root,
         title="Model Observability Incident Platform",
@@ -217,6 +224,7 @@ def demo(output: str | Path) -> dict:
         "release_admission": release_admission,
         "operational_readiness": operational_readiness,
         "judge_demo_cockpit": judge_demo_cockpit,
+        "operator_drill": operator_drill,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
         "orchestration_scorecard": orchestration_scorecard,

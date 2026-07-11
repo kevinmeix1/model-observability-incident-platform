@@ -42,6 +42,7 @@ from .kuberay_capacity import build_kuberay_capacity_plan
 from .memory_qos import build_memory_qos_plan
 from .multi_team_readiness import build_multi_team_readiness_plan
 from .multikueue_dispatch import build_multikueue_dispatch_plan
+from .narrated_demo_studio import build_narrated_demo_studio
 from .network_security import build_network_security_report
 from .orchestration_scorecard import build_orchestration_scorecard
 from .operational_readiness import build_operational_readiness_review
@@ -168,6 +169,13 @@ def demo(output: str | Path) -> dict:
         domain="Incident response and model reliability control",
         primary_dashboard="model_observability_dashboard.html",
     )
+    narrated_demo_studio = build_narrated_demo_studio(
+        root,
+        project_name="Model Observability Incident Platform",
+        domain="Incident response and model reliability control",
+        primary_dashboard="model_observability_dashboard.html",
+        demo_video="../../docs/demo/model-observability-judge-demo.mp4",
+    )
     artifact_index = render_artifact_index(
         root,
         title="Model Observability Incident Platform",
@@ -233,6 +241,7 @@ def demo(output: str | Path) -> dict:
         "judge_demo_cockpit": judge_demo_cockpit,
         "operator_drill": operator_drill,
         "reliability_signal_mesh": reliability_signal_mesh,
+        "narrated_demo_studio": narrated_demo_studio,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
         "orchestration_scorecard": orchestration_scorecard,

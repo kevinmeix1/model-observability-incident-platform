@@ -6,7 +6,7 @@ The review aggregates incident severity, release admission, SLO burn rate, root-
 
 The packet is intentionally fail-closed. If incident control is missing, page-level burn is active, root-cause evidence is incomplete, alert routing is not ready, provenance is absent, or diagnostic budgets fail, the recommendation becomes remediation instead of approval.
 
-Judge demo talking points:
+Interview review prompts:
 
 - The platform shows what failed, who owns it, and which downstream assets are at risk.
 - Incident, SLO, alert-routing, root-cause, and provenance evidence are reviewed together.

@@ -5,6 +5,8 @@ import html
 import json
 from pathlib import Path
 
+from .operator_console import decorate_console
+
 
 def esc(value: object) -> str:
     return html.escape("" if value is None else str(value))
@@ -312,11 +314,11 @@ def render_dashboard(
           <div class="metric"><span>API runtime contract</span><strong>{badge(bool(runtime_contract.get('passed', False)))}</strong></div>
           <div class="metric"><span>Notification outbox</span><strong>{badge(bool(notification_contract.get('passed', False)))}</strong></div>
         </section>
-        <section class="panel evidence-deck" data-testid="judge-evidence-deck">
+        <section class="panel evidence-deck" data-testid="release-evidence">
           <div class="evidence-head">
             <div>
-              <h2>Judge Evidence Deck</h2>
-              <p>This panel turns the observability demo into an incident-review story: every alert must explain owner, evidence, downstream impact, and recovery path.</p>
+              <h2>Incident Evidence</h2>
+              <p>Every alert is linked to an owner, supporting signals, downstream impact, and a bounded recovery path.</p>
             </div>
             <span class="badge neutral">incident review mode</span>
           </div>
@@ -327,10 +329,10 @@ def render_dashboard(
             <div class="evidence-card"><span>Response</span><strong>Routing and remediation are guarded</strong><p>Alert grouping, inhibition, receiver timing, blast radius, and human approval gates are visible in the triage lab.</p></div>
           </div>
         </section>
-        <section class="panel demo-theater" data-testid="demo-theater">
+        <section class="panel demo-theater" data-testid="run-review">
           <div class="evidence-head">
-            <div><h2>Judge Demo Theater</h2><p>Demo the incident control plane like an on-call review: detect, explain, route, recover, and prove the evidence was durable.</p></div>
-            <span class="badge neutral">narrated demo</span>
+            <div><h2>Incident Review</h2><p>A timed review of detection, explanation, routing, recovery, and durable incident evidence.</p></div>
+            <span class="badge neutral">guided runbook</span>
           </div>
           <div class="theater-grid">
             <div class="theater-stage" aria-live="polite">
@@ -350,10 +352,10 @@ def render_dashboard(
                 <div><span>Evidence</span><strong>runtime + static reports</strong></div>
               </div>
               <div class="theater-progress"><span id="theaterProgress"></span></div>
-              <p id="theaterNotes" class="theater-notes">Reviewer path: run <code>make demo</code>, then <code>make api-run</code> for live incident creation and recovery.</p>
+              <p id="theaterNotes" class="theater-notes">Generate a deterministic snapshot with <code>make demo</code>; attach <code>make api-run</code> for live incident creation and recovery.</p>
               <div class="theater-links">
-                <a href="../../docs/demo/model-observability-judge-demo.mp4">Watch video</a>
-                <a href="../../docs/judge-demo.md">Demo script</a>
+                <a href="../../docs/demo/model-observability-judge-demo.mp4">Open recording</a>
+                <a href="../../docs/judge-demo.md">Run review notes</a>
                 <a href="../../docs/demo-narration.txt">Narration text</a>
                 <a href="index.html">Artifact index</a>
               </div>
@@ -365,7 +367,7 @@ def render_dashboard(
             const cues = [
               {{cue: "Detect", title: "Start with model reliability risk", body: "Explain that this platform watches whether deployed models remain safe to operate, not just whether an API is up.", notes: "Open with global health, failed checks, severity, and bounded telemetry inputs."}},
               {{cue: "Incident", title: "Create a durable incident", body: "Use the live lab to submit a degraded window and show incident dedupe, SQLite WAL state, and CloudEvents outbox delivery.", notes: "This proves the dashboard is connected to transactional runtime evidence when the API is running."}},
-              {{cue: "Route", title: "Triage by root cause and lineage", body: "Move to alert routing, inhibition, receiver timing, impacted assets, and guarded remediation.", notes: "Judges should hear why fewer alerts with better context beats noisy dashboards."}},
+              {{cue: "Route", title: "Triage by root cause and lineage", body: "Move to alert routing, inhibition, receiver timing, impacted assets, and guarded remediation.", notes: "Grouped alerts with explicit context reduce noise and shorten the path to a bounded action."}},
               {{cue: "Recover", title: "Show recovery and rollout protection", body: "Finish with two-window recovery, stale worker fencing, last-known-good dashboard publishing, and release freeze logic.", notes: "The project demonstrates observability as a release control plane, not passive reporting."}}
             ];
             const item = cues[index] || cues[0];
@@ -846,5 +848,5 @@ def render_dashboard(
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(body, encoding="utf-8")
+    output_path.write_text(decorate_console(body, active="dashboard"), encoding="utf-8")
     return output_path

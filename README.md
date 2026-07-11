@@ -7,21 +7,25 @@ telemetry, opens durable incidents, freezes unsafe releases, and records
 recovery evidence. Version `0.3.0` also proves reliable incident notification
 delivery through a transactional CloudEvents outbox.
 
-This is a portfolio project, not a production service. It uses deterministic
+This is a production-style reference implementation, not a managed production service. It uses deterministic
 synthetic telemetry and a single-process SQLite runtime so its correctness and
 failure behavior can be reviewed without cloud credentials.
 
 ![Live model incident response dashboard](docs/screenshots/dashboard.png)
 
-[Watch the narrated judge demo](docs/demo/model-observability-judge-demo.mp4) | [Follow the live demo script](docs/judge-demo.md)
+[Watch the narrated operations review](docs/demo/model-observability-judge-demo.mp4) | [Follow the run-review notes](docs/judge-demo.md)
 
 For a study-oriented walkthrough with the full architecture diagram,
 step-by-step screenshot guide, code reading order, and interview explanations,
 start with [the project study guide](docs/study-guide.md).
 
-![Judge evidence deck](docs/screenshots/dashboard-evidence-deck.png)
+The UI is governed by an offline, tested operator-console system. Its rationale,
+open-source references, accessibility contract, and review checklist are in the
+[design-system notes](docs/design-system.md).
 
-![Judge demo theater](docs/screenshots/dashboard-demo-theater.png)
+![Incident evidence](docs/screenshots/dashboard-evidence-deck.png)
+
+![Incident review](docs/screenshots/dashboard-demo-theater.png)
 
 ## What Is Executable
 
@@ -81,11 +85,11 @@ open .local/reports/reliability_signal_mesh.html
 open .local/reports/narrated_demo_studio.html
 ```
 
-The judge demo cockpit links the incident dashboard, narrated video,
+The Operations Review links the incident dashboard, narrated run review,
 operational readiness packet, and generated evidence artifacts behind
 interactive release, observability, governance, and operator-handoff filters.
 
-![Judge demo cockpit](docs/screenshots/dashboard-judge-cockpit.jpg)
+![Operations review](docs/screenshots/study-02-judge-cockpit.png)
 
 The Operator Drill Lab rehearses detection, triage, containment, recovery, and
 blameless postmortem follow-up from the generated incident evidence.
@@ -98,11 +102,11 @@ decisions into one operator-facing evidence graph.
 
 ![Reliability signal mesh](docs/screenshots/dashboard-reliability-signal-mesh.png)
 
-The Narrated Demo Studio turns the evidence bundle into a judge-facing chapter
+The Narrated Run Review turns the evidence bundle into an operator-facing chapter
 timeline with natural voice backends, Remotion props, subtitle timing, and
 evidence-linked visuals.
 
-![Narrated demo studio](docs/screenshots/dashboard-narrated-demo-studio.png)
+![Narrated run review](docs/screenshots/dashboard-narrated-demo-studio.png)
 
 Exercise the actual HTTP runtime with Python 3.12:
 
@@ -143,7 +147,6 @@ updates four stable incident fingerprints; each lifecycle event commits with a
 CloudEvent outbox row. `Send 2-window recovery` exercises policy hysteresis,
 resolves the incidents, and returns the release decision to `CONTINUE`.
 
-![Recovered release with drained notification outbox](docs/screenshots/dashboard-recovery.png)
 
 Useful endpoints:
 
@@ -222,19 +225,11 @@ dedupe identity. It attaches symptom-first SLO burn evidence, OpenLineage-style
 facets, rollout feature-flag context, confidence, and missing evidence to
 `reports/root_cause_evidence_bundle.json` and the dashboard.
 
-![Root-cause evidence dashboard panel](docs/screenshots/dashboard-root-cause-evidence.png)
 
 ### Alert routing and guarded remediation
 
 The alert routing plan models Alertmanager grouping, inhibition, escalation, and receiver routing before the transactional outbox sees an incident event. It also classifies remediation actions by blast radius: rollout freezes and diagnostic fanout are automatic, while resource-increasing diagnostic scaling requires human approval. The dashboard includes an interactive triage lab so a reviewer can choose an alert group, see which symptoms are suppressed, inspect receiver timing, and trace the OpenLineage column-impact path before accepting the remediation. See [alert routing and guarded remediation](docs/alert-routing-remediation.md).
 
-![Alert routing and remediation dashboard panel](docs/screenshots/dashboard-alert-routing-remediation.png)
-
-Mobile capture: [dashboard-alert-routing-remediation-mobile.png](docs/screenshots/dashboard-alert-routing-remediation-mobile.png)
-
-![Alert routing triage lab](docs/screenshots/dashboard-alert-routing-triage.png)
-
-Mobile triage capture: [dashboard-alert-routing-triage-mobile.png](docs/screenshots/dashboard-alert-routing-triage-mobile.png)
 
 ### Transactional notifications
 
@@ -279,7 +274,6 @@ Evaluation IDs, request IDs, incident IDs, model versions, raw features, and
 telemetry records are intentionally excluded from metric labels. Raw features
 and request bodies are also excluded from logs and spans.
 
-![Runtime and transactional delivery evidence](docs/screenshots/dashboard-delivery.png)
 
 ## Airflow And Kubernetes Scope
 

@@ -179,7 +179,7 @@ def demo(output: str | Path) -> dict:
     artifact_index = render_artifact_index(
         root,
         title="Model Observability Incident Platform",
-        description="Reviewer landing page for generated reliability dashboard, incident evidence, SLOs, migration, and governance artifacts.",
+        description="Generated registry for incident state, root-cause evidence, SLO budgets, lineage impact, and recovery controls.",
         dashboard="model_observability_dashboard.html",
     )
     orchestration_scorecard = build_orchestration_scorecard(root, project="Model Observability Incident Platform")

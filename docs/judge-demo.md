@@ -1,4 +1,4 @@
-# Judge Demo
+# Operations Review Runbook
 
 This walkthrough demonstrates the executable control plane, not only the
 generated static evidence. Use Python 3.12 so the exact lock audit matches CI.
@@ -37,7 +37,7 @@ Terminal two:
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m model_observability_platform.notification_worker \
-  --state-root .local --worker-id judge-demo-worker --poll-seconds 0.5
+  --state-root .local --worker-id run-review-worker --poll-seconds 0.5
 ```
 
 Open `http://127.0.0.1:8081/dashboard` and demonstrate this sequence:
@@ -52,8 +52,8 @@ Repeated degraded evaluations should update the same incident fingerprints.
 The delivery worker should return pending and in-flight notification counts to
 zero after each lifecycle action.
 
-The dashboard includes a **Judge Demo Theater** panel that keeps the live review
-focused on detection, durable incidents, alert routing, and recovery evidence.
+The dashboard includes an **Incident Review** panel organized around detection,
+durable incidents, alert routing, and recovery evidence.
 
 ## 3. Generate The Narrated Video
 
@@ -76,7 +76,7 @@ Offline voice engines such as Piper or Kokoro can replace the synthesis step
 when a fully local media pipeline is required, but `edge-tts` keeps the committed
 demo natural-sounding and lightweight.
 
-## Judge Narrative
+## Operational Narrative
 
 - The UI submits real bounded telemetry and reflects durable API state.
 - Stable fingerprints prevent alert storms while preserving occurrence evidence.

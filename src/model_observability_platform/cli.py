@@ -7,6 +7,9 @@ from pathlib import Path
 from .accelerator_plan import build_accelerator_capacity_plan
 from .admin_access_diagnostics import build_admin_access_diagnostic_plan
 from .advanced_device_sharing import build_advanced_device_sharing_plan
+from .alert_routing_remediation import build_alert_routing_remediation_plan
+from .ai_workload_telemetry import build_ai_workload_telemetry_plan
+from .airflow_stateful_orchestration import build_airflow_stateful_orchestration_plan
 from .artifact_index import render_artifact_index
 from .asset_partitioning import build_asset_partitioning_plan
 from .chaos import run_chaos_drill
@@ -18,6 +21,7 @@ from .constrained_impersonation import build_constrained_impersonation_plan
 from .cost_observability import build_cost_observability_report
 from .dag_bundle_versioning import build_dag_bundle_versioning_plan
 from .dashboard import render_dashboard
+from .demo_cockpit import build_judge_demo_cockpit, build_operator_drill_lab
 from .deadline_alerts import build_deadline_alert_plan
 from .device_allocation import build_device_allocation_plan
 from .disaster_recovery import build_disaster_recovery_plan
@@ -33,13 +37,15 @@ from .incidents import create_incidents
 from .indexed_job_resilience import build_indexed_job_resilience_plan
 from .inplace_resize import build_inplace_resize_plan
 from .inference_gateway import build_inference_gateway_plan
-from .io import read_csv, write_json
+from .io import read_csv, read_json, write_json
 from .kuberay_capacity import build_kuberay_capacity_plan
 from .memory_qos import build_memory_qos_plan
 from .multi_team_readiness import build_multi_team_readiness_plan
 from .multikueue_dispatch import build_multikueue_dispatch_plan
+from .narrated_demo_studio import build_narrated_demo_studio
 from .network_security import build_network_security_report
 from .orchestration_scorecard import build_orchestration_scorecard
+from .operational_readiness import build_operational_readiness_review
 from .pending_workload_visibility import build_pending_workload_visibility_plan
 from .policy_audit import audit_platform_policy
 from .performance_budget import build_performance_budget_report
@@ -47,10 +53,13 @@ from .pod_resource_envelopes import build_pod_resource_envelope_plan
 from .provisioning_admission import build_provisioning_admission_plan
 from .queue_simulator import build_queue_simulation
 from .release_admission import build_release_admission_decision
+from .reliability_signal_mesh import build_reliability_signal_mesh
 from .reliability_control import build_reliability_plan
 from .resource_health_status import build_resource_health_status_plan
+from .root_cause_evidence import build_root_cause_evidence_bundle
 from .resource_optimizer import build_resource_optimization_report
 from .runtime_security import build_runtime_security_plan
+from .runtime_state import IncidentStore
 from .semantic_telemetry import build_semantic_telemetry_plan
 from .slo import build_slo_report
 from .supply_chain import build_supply_chain_evidence
@@ -102,6 +111,7 @@ def demo(output: str | Path) -> dict:
     multikueue_dispatch = build_multikueue_dispatch_plan(root)
     dag_bundle_versioning = build_dag_bundle_versioning_plan(root)
     asset_partitioning = build_asset_partitioning_plan(root)
+    airflow_stateful_orchestration = build_airflow_stateful_orchestration_plan(root)
     multi_team_readiness = build_multi_team_readiness_plan(root)
     event_driven_assets = build_event_driven_assets_plan(root)
     pod_resource_envelopes = build_pod_resource_envelope_plan(root)
@@ -120,11 +130,16 @@ def demo(output: str | Path) -> dict:
     suspended_job_resources = build_suspended_job_resource_plan(root)
     constrained_impersonation = build_constrained_impersonation_plan(root)
     incident_evidence_volume = build_incident_evidence_volume_plan(root)
+    root_cause_evidence = build_root_cause_evidence_bundle(root)
+    alert_routing = build_alert_routing_remediation_plan(root)
+    ai_workload_telemetry = build_ai_workload_telemetry_plan(root)
     dashboard = render_dashboard(
         root / "reports" / "model_observability_dashboard.html",
         report=report,
         incident_summary=incident_summary,
         reliability_plan=reliability_plan,
+        root_cause_evidence=root_cause_evidence,
+        alert_routing=alert_routing,
     )
     supply_chain = build_supply_chain_evidence(
         root,
@@ -134,10 +149,37 @@ def demo(output: str | Path) -> dict:
         namespace="mlops-observability",
     )
     release_admission = build_release_admission_decision(root)
+    operational_readiness = build_operational_readiness_review(root)
+    judge_demo_cockpit = build_judge_demo_cockpit(
+        root,
+        project_name="Model Observability Incident Platform",
+        primary_dashboard="model_observability_dashboard.html",
+        demo_video="../../docs/demo/model-observability-judge-demo.mp4",
+    )
+    operator_drill = build_operator_drill_lab(
+        root,
+        project_name="Model Observability Incident Platform",
+        scenario="Compound feature drift and serving degradation require incident freeze and root-cause evidence",
+        primary_dashboard="model_observability_dashboard.html",
+        runbook="../../docs/runbook.md",
+    )
+    reliability_signal_mesh = build_reliability_signal_mesh(
+        root,
+        project_name="Model Observability Incident Platform",
+        domain="Incident response and model reliability control",
+        primary_dashboard="model_observability_dashboard.html",
+    )
+    narrated_demo_studio = build_narrated_demo_studio(
+        root,
+        project_name="Model Observability Incident Platform",
+        domain="Incident response and model reliability control",
+        primary_dashboard="model_observability_dashboard.html",
+        demo_video="../../docs/demo/model-observability-judge-demo.mp4",
+    )
     artifact_index = render_artifact_index(
         root,
         title="Model Observability Incident Platform",
-        description="Reviewer landing page for generated reliability dashboard, incident evidence, SLOs, migration, and governance artifacts.",
+        description="Generated registry for incident state, root-cause evidence, SLO budgets, lineage impact, and recovery controls.",
         dashboard="model_observability_dashboard.html",
     )
     orchestration_scorecard = build_orchestration_scorecard(root, project="Model Observability Incident Platform")
@@ -173,6 +215,7 @@ def demo(output: str | Path) -> dict:
         "multikueue_dispatch": multikueue_dispatch,
         "dag_bundle_versioning": dag_bundle_versioning,
         "asset_partitioning": asset_partitioning,
+        "airflow_stateful_orchestration": airflow_stateful_orchestration,
         "event_driven_assets": event_driven_assets,
         "pod_resource_envelopes": pod_resource_envelopes,
         "cohort_fair_sharing": cohort_fair_sharing,
@@ -190,12 +233,42 @@ def demo(output: str | Path) -> dict:
         "suspended_job_resources": suspended_job_resources,
         "constrained_impersonation": constrained_impersonation,
         "incident_evidence_volume": incident_evidence_volume,
+        "root_cause_evidence": root_cause_evidence,
+        "alert_routing": alert_routing,
+        "ai_workload_telemetry": ai_workload_telemetry,
         "release_admission": release_admission,
+        "operational_readiness": operational_readiness,
+        "judge_demo_cockpit": judge_demo_cockpit,
+        "operator_drill": operator_drill,
+        "reliability_signal_mesh": reliability_signal_mesh,
+        "narrated_demo_studio": narrated_demo_studio,
         "dashboard": str(dashboard),
         "artifact_index": str(artifact_index),
         "orchestration_scorecard": orchestration_scorecard,
         "supply_chain": supply_chain,
         "multi_team_readiness": multi_team_readiness,
+    }
+
+
+def demo_summary(result: dict) -> dict:
+    failed_checks = [
+        check["name"] for check in result["report"]["checks"] if not check["passed"]
+    ]
+    return {
+        "demo_completed": True,
+        "monitoring_passed": result["report"]["passed"],
+        "failed_checks": failed_checks,
+        "incidents": {
+            "created": result["incidents"].get("created_count", 0),
+            "open": result["incidents"].get("open_count", 0),
+            "top_severity": result["incidents"].get("severity", "low"),
+        },
+        "release_frozen": not result["release_admission"]
+        .get("decision", {})
+        .get("admitted", True),
+        "dashboard": result["dashboard"],
+        "artifact_index": result["artifact_index"],
+        "next_runtime_step": "make runtime-contract && make dashboard",
     }
 
 
@@ -216,6 +289,57 @@ def slo_report(output: str | Path) -> dict:
     if not (root / "reports" / "reliability_control_plan.json").exists():
         governance(root)
     return build_slo_report(root)
+
+
+def initialize_runtime(output: str | Path) -> dict:
+    root = Path(output)
+    path = root / "runtime" / "incidents.sqlite3"
+    store = IncidentStore(path)
+    return {
+        "ready": store.ready(),
+        "state_backend": "sqlite-wal",
+        "database": str(path),
+        "summary": store.summary(),
+    }
+
+
+def render_current_dashboard(output: str | Path) -> dict:
+    root = Path(output)
+    required = {
+        "report": root / "reports" / "observability_report.json",
+        "incidents": root / "reports" / "incident_summary.json",
+        "reliability": root / "reports" / "reliability_control_plan.json",
+    }
+    missing = [str(path) for path in required.values() if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"missing dashboard inputs: {', '.join(missing)}")
+    runtime_path = root / "reports" / "observability_runtime_contract.json"
+    notification_path = root / "reports" / "notification_outbox_contract.json"
+    root_cause_evidence_path = root / "reports" / "root_cause_evidence_bundle.json"
+    alert_routing_path = root / "reports" / "alert_routing_remediation_plan.json"
+    dashboard = render_dashboard(
+        root / "reports" / "model_observability_dashboard.html",
+        report=read_json(required["report"]),
+        incident_summary=read_json(required["incidents"]),
+        reliability_plan=read_json(required["reliability"]),
+        runtime_contract=read_json(runtime_path) if runtime_path.exists() else None,
+        notification_contract=(
+            read_json(notification_path) if notification_path.exists() else None
+        ),
+        root_cause_evidence=(
+            read_json(root_cause_evidence_path)
+            if root_cause_evidence_path.exists()
+            else None
+        ),
+        alert_routing=read_json(alert_routing_path) if alert_routing_path.exists() else None,
+    )
+    return {
+        "dashboard": str(dashboard),
+        "runtime_contract_included": runtime_path.exists(),
+        "notification_contract_included": notification_path.exists(),
+        "root_cause_evidence_included": root_cause_evidence_path.exists(),
+        "alert_routing_included": alert_routing_path.exists(),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -254,6 +378,7 @@ def main(argv: list[str] | None = None) -> int:
         "multikueue-dispatch",
         "dag-bundle-plan",
         "asset-partitioning-plan",
+        "airflow-stateful-orchestration",
         "multi-team-readiness",
         "event-driven-assets",
         "pod-resource-envelopes",
@@ -272,13 +397,21 @@ def main(argv: list[str] | None = None) -> int:
         "suspended-job-resources",
         "constrained-impersonation",
         "incident-evidence-volumes",
+        "root-cause-evidence",
+        "alert-routing-remediation",
         "release-admission",
+        "runtime-init",
+        "dashboard",
     ]:
         cmd = sub.add_parser(command)
         cmd.add_argument("--output", default=".local")
     args = parser.parse_args(argv)
     if args.command == "demo":
-        print(json.dumps(demo(args.output), indent=2, sort_keys=True))
+        print(json.dumps(demo_summary(demo(args.output)), indent=2, sort_keys=True))
+    elif args.command == "runtime-init":
+        print(json.dumps(initialize_runtime(args.output), indent=2, sort_keys=True))
+    elif args.command == "dashboard":
+        print(json.dumps(render_current_dashboard(args.output), indent=2, sort_keys=True))
     elif args.command == "reliability-plan":
         print(json.dumps(build_reliability_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "policy-audit":
@@ -341,6 +474,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_dag_bundle_versioning_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "asset-partitioning-plan":
         print(json.dumps(build_asset_partitioning_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "airflow-stateful-orchestration":
+        print(json.dumps(build_airflow_stateful_orchestration_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "multi-team-readiness":
         print(json.dumps(build_multi_team_readiness_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "event-driven-assets":
@@ -377,6 +512,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(build_constrained_impersonation_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "incident-evidence-volumes":
         print(json.dumps(build_incident_evidence_volume_plan(args.output), indent=2, sort_keys=True))
+    elif args.command == "root-cause-evidence":
+        print(json.dumps(build_root_cause_evidence_bundle(args.output), indent=2, sort_keys=True))
+    elif args.command == "alert-routing-remediation":
+        print(json.dumps(build_alert_routing_remediation_plan(args.output), indent=2, sort_keys=True))
     elif args.command == "release-admission":
         print(json.dumps(build_release_admission_decision(args.output), indent=2, sort_keys=True))
     return 0

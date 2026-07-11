@@ -1,0 +1,145 @@
+name: model-observability-incident-platform
+
+services:
+  state-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: model-observability-incident-platform:local
+    entrypoint: ["python", "-m", "model_observability_platform"]
+    command: ["runtime-init", "--output", "/var/lib/model-observability"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    volumes:
+      - observability-state:/var/lib/model-observability
+    networks: [control-plane]
+    restart: "no"
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: model-observability-incident-platform:local
+    depends_on:
+      state-init:
+        condition: service_completed_successfully
+    environment:
+      OBSERVABILITY_STATE_ROOT: /var/lib/model-observability
+      DEPLOYMENT_ENVIRONMENT: compose
+      MAX_CONCURRENCY: "8"
+      MAX_REQUEST_BYTES: "2000000"
+      QUEUE_TIMEOUT_SECONDS: "0.25"
+      AUTO_RESOLVE_AFTER: "2"
+      TRACE_SAMPLE_RATIO: "1.0"
+      CAPTURE_SPANS: "false"
+      LOG_LEVEL: INFO
+    ports:
+      - "${OBSERVABILITY_PORT:-8081}:8080"
+    read_only: true
+    init: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    volumes:
+      - observability-state:/var/lib/model-observability
+    networks: [control-plane]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/ready', timeout=1).read()",
+        ]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 5s
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  notification-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: model-observability-incident-platform:local
+    profiles: ["delivery"]
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    entrypoint: ["python", "-m", "model_observability_platform.notification_worker"]
+    command:
+      - --state-root
+      - /var/lib/model-observability
+      - --worker-id
+      - compose-notification-worker
+      - --batch-size
+      - "25"
+      - --lease-seconds
+      - "30"
+      - --poll-seconds
+      - "1"
+    environment:
+      OBSERVABILITY_STATE_ROOT: /var/lib/model-observability
+    read_only: true
+    init: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    volumes:
+      - observability-state:/var/lib/model-observability
+    networks: [control-plane]
+    stop_grace_period: 10s
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.4
+    profiles: ["observability"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 0.5
+    volumes:
+      - ./monitoring/prometheus/compose.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [control-plane]
+    restart: unless-stopped
+
+networks:
+  control-plane:
+    name: model-observability-control-plane
+
+volumes:
+  observability-state:
+  prometheus-data:

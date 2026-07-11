@@ -7,6 +7,9 @@ from pathlib import Path
 from model_observability_platform.accelerator_plan import build_accelerator_capacity_plan
 from model_observability_platform.admin_access_diagnostics import build_admin_access_diagnostic_plan
 from model_observability_platform.advanced_device_sharing import build_advanced_device_sharing_plan
+from model_observability_platform.alert_routing_remediation import build_alert_routing_remediation_plan
+from model_observability_platform.ai_workload_telemetry import build_ai_workload_telemetry_plan
+from model_observability_platform.airflow_stateful_orchestration import build_airflow_stateful_orchestration_plan
 from model_observability_platform.asset_partitioning import build_asset_partitioning_plan
 from model_observability_platform.chaos import run_chaos_drill
 from model_observability_platform.checks import likely_root_cause, run_checks
@@ -17,6 +20,8 @@ from model_observability_platform.control_plane_diagnostics import build_control
 from model_observability_platform.constrained_impersonation import build_constrained_impersonation_plan
 from model_observability_platform.cost_observability import build_cost_observability_report
 from model_observability_platform.dag_bundle_versioning import build_dag_bundle_versioning_plan
+from model_observability_platform.demo_cockpit import build_judge_demo_cockpit, build_operator_drill_lab
+from model_observability_platform.narrated_demo_studio import build_narrated_demo_studio
 from model_observability_platform.deadline_alerts import build_deadline_alert_plan
 from model_observability_platform.device_allocation import build_device_allocation_plan
 from model_observability_platform.disaster_recovery import build_disaster_recovery_plan
@@ -39,6 +44,7 @@ from model_observability_platform.multi_team_readiness import build_multi_team_r
 from model_observability_platform.multikueue_dispatch import build_multikueue_dispatch_plan
 from model_observability_platform.network_security import build_network_security_report
 from model_observability_platform.orchestration_scorecard import build_orchestration_scorecard
+from model_observability_platform.operational_readiness import build_operational_readiness_review
 from model_observability_platform.pending_workload_visibility import build_pending_workload_visibility_plan
 from model_observability_platform.policy_audit import audit_platform_policy
 from model_observability_platform.performance_budget import build_performance_budget_report
@@ -46,8 +52,10 @@ from model_observability_platform.pod_resource_envelopes import build_pod_resour
 from model_observability_platform.provisioning_admission import build_provisioning_admission_plan
 from model_observability_platform.queue_simulator import build_queue_simulation
 from model_observability_platform.release_admission import build_release_admission_decision, evaluate_release_admission
+from model_observability_platform.reliability_signal_mesh import build_reliability_signal_mesh
 from model_observability_platform.reliability_control import build_reliability_plan, burn_rate
 from model_observability_platform.resource_health_status import build_resource_health_status_plan
+from model_observability_platform.root_cause_evidence import build_root_cause_evidence_bundle
 from model_observability_platform.resource_optimizer import build_resource_optimization_report
 from model_observability_platform.runtime_security import build_runtime_security_plan
 from model_observability_platform.semantic_telemetry import build_semantic_telemetry_plan
@@ -209,6 +217,21 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         for expected in ["kind: ConfigMap", "otlp", "k8sattributes", "memory_limiter", "attributes/semantic_redaction", "gen_ai.input.messages", "incident.payload", "prometheus", "batch"]:
             self.assertIn(expected, collector)
 
+    def test_ai_workload_telemetry_plan_covers_incident_runtime_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = build_ai_workload_telemetry_plan(root)
+            resource_fields = set(plan["required_resource_fields"])
+            otel_fields = set(plan["required_otel_fields"])
+
+            self.assertTrue(plan["passed"])
+            self.assertIn("incident.id", otel_fields)
+            self.assertIn("airflow.asset.uri", otel_fields)
+            self.assertTrue(any(field.startswith("dra.") for field in resource_fields))
+            self.assertTrue(any("last-known-good" in workload["remediation"] for workload in plan["workloads"]))
+            self.assertTrue(any(workload["queue"] == "incident-critical" for workload in plan["workloads"]))
+            self.assertTrue((root / "reports" / "ai_workload_telemetry_plan.json").exists())
+
     def test_chaos_drill_and_chaos_mesh_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         chaos_manifest = (repo / "kubernetes" / "chaos-experiments.yaml").read_text(encoding="utf-8")
@@ -337,10 +360,99 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
         workflow = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         makefile = (repo / "Makefile").read_text(encoding="utf-8")
 
-        for expected in ["actions/upload-artifact@v6", "actions/attest@v4", "attestations: write", "GITHUB_STEP_SUMMARY", "make ci-verify", "concurrency"]:
+        for expected in [
+            "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+            "actions/attest@f6bf1532d7d6793fce74eac584813a8eee607999",
+            "attestations: write",
+            "GITHUB_STEP_SUMMARY",
+            "make ci-verify",
+            "concurrency",
+        ]:
             self.assertIn(expected, workflow)
-        for expected in ["ci-verify:", "index.html", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
+        for expected in ["ci-verify:", "index.html", "operational_readiness_review.json", "judge_demo_cockpit.html", "judge_demo_cockpit_manifest.json", "operator_drill_lab.html", "operator_drill_report.json", "reliability_signal_mesh.html", "reliability_signal_mesh.json", "narrated_demo_studio.html", "narrated_demo_studio.json", "remotion_demo_props.json", "narrated_demo_subtitle_plan.srt", "pending_workload_visibility_plan.json", "flavor_fungibility_plan.json", "cohort_fair_sharing_plan.json", "tenancy_fairness_report.json", "identity_access_report.json", "event_driven_assets_plan.json", "multi_team_readiness_plan.json", "asset_partitioning_plan.json", "dag_bundle_versioning_plan.json", "multikueue_dispatch_plan.json", "incident_evidence_volume_plan.json", "root_cause_evidence_bundle.json", "alert_routing_remediation_plan.json", "provisioning_admission_plan.json", "indexed_job_resilience_plan.json", "elastic_workload_plan.json", "cost_observability_report.json", "deadline_alert_plan.json", "semantic_telemetry_plan.json", "inference_gateway_plan.json", "kuberay_capacity_plan.json", "topology_placement_plan.json", "inplace_resize_plan.json", "admin_access_diagnostics_plan.json", "advanced_device_sharing_plan.json", "resource_health_status_plan.json", "release_admission_decision.json", "runtime_security_plan.json", "control_plane_diagnostics_plan.json", "memory_qos_plan.json", "hpa_scale_to_zero_plan.json", "suspended_job_resources_plan.json", "constrained_impersonation_plan.json", "workload_aware_scheduling_plan.json", "queue_simulation.json", "performance_budget.json", "device_allocation_plan.json", "accelerator_capacity_plan.json", "orchestration_scorecard.json", "supply_chain_evidence.json", "governance_evidence_bundle.json", "cloud_migration_plan.json"]:
             self.assertIn(expected, makefile)
+
+    def test_operational_readiness_review_aggregates_incident_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            review = build_operational_readiness_review(root)
+
+            self.assertEqual(result["operational_readiness"]["target"], "airflow://ml-observability/model-reliability-control-plane")
+            self.assertGreaterEqual(review["readiness_score"], 80.0)
+            self.assertIn("reports/root_cause_evidence_bundle.json", review["operator_review_packet"])
+            self.assertTrue(any(check["name"] == "root_cause_and_alert_routing_ready" for check in review["checks"]))
+            self.assertTrue((root / "reports" / "operational_readiness_review.json").exists())
+
+    def test_judge_demo_cockpit_links_incident_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            cockpit = build_judge_demo_cockpit(
+                root,
+                project_name="Model Observability Incident Platform",
+                primary_dashboard="model_observability_dashboard.html",
+                demo_video="../../docs/demo/model-observability-judge-demo.mp4",
+            )
+            html = (root / "reports" / "judge_demo_cockpit.html").read_text(encoding="utf-8")
+            self.assertEqual(result["judge_demo_cockpit"]["scenario_count"], 4)
+            self.assertGreaterEqual(cockpit["evidence_count"], 8)
+            self.assertIn("Model Observability Incident Platform", html)
+            self.assertIn("Run Manifest", html)
+
+    def test_operator_drill_lab_rehearses_incident_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            drill = build_operator_drill_lab(
+                root,
+                project_name="Model Observability Incident Platform",
+                scenario="incident drill",
+                primary_dashboard="model_observability_dashboard.html",
+                runbook="../../docs/runbook.md",
+            )
+            html = (root / "reports" / "operator_drill_lab.html").read_text(encoding="utf-8")
+            self.assertEqual(result["operator_drill"]["status"], "ready")
+            self.assertIn("slo.burn_rate", drill["telemetry_contract"])
+            self.assertIn("Operator Drill Lab", html)
+            self.assertTrue((root / "reports" / "operator_drill_report.json").exists())
+
+    def test_narrated_demo_studio_generates_incident_video_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            studio = build_narrated_demo_studio(
+                root,
+                project_name="Model Observability Incident Platform",
+                domain="Incident response and model reliability control",
+                primary_dashboard="model_observability_dashboard.html",
+                demo_video="../../docs/demo/model-observability-judge-demo.mp4",
+            )
+            html = (root / "reports" / "narrated_demo_studio.html").read_text(encoding="utf-8")
+            props = read_json(root / "reports" / "remotion_demo_props.json")
+            self.assertEqual(result["narrated_demo_studio"]["status"], "ready")
+            self.assertIn("kokoro_local", {item["name"] for item in studio["natural_voice_backends"]})
+            self.assertIn("Remotion props", html)
+            self.assertEqual(props["durationInFrames"], 5220)
+            self.assertTrue((root / "reports" / "narrated_demo_subtitle_plan.srt").exists())
+
+    def test_reliability_signal_mesh_connects_incident_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            mesh = build_reliability_signal_mesh(
+                root,
+                project_name="Model Observability Incident Platform",
+                domain="incident mesh",
+                primary_dashboard="model_observability_dashboard.html",
+            )
+            html = (root / "reports" / "reliability_signal_mesh.html").read_text(encoding="utf-8")
+            self.assertEqual(result["reliability_signal_mesh"]["status"], "ready")
+            self.assertEqual(mesh["readiness_score"], 100.0)
+            self.assertIn("release.decision", mesh["semantic_contract"])
+            self.assertGreaterEqual(mesh["operator_readiness"], 80.0)
+            self.assertIn("Reliability Signal Mesh", html)
+            self.assertTrue((root / "reports" / "reliability_signal_mesh.json").exists())
 
     def test_accelerator_capacity_plan_and_kubernetes_assets_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -530,6 +642,10 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertEqual(report["recommended_action"], "enable_airflow3_observability_deadline_alerts")
             self.assertEqual(report["runtime_config"]["AIRFLOW__CALLBACKS__CALLBACK_EXECUTION_TIMEOUT"], "300")
             self.assertTrue(any(policy["name"] == "incident_creation_latency" for policy in report["deadline_policies"]))
+            self.assertIn("callback_contracts", report)
+            self.assertIn("page_incident_router_owner", report["callback_contracts"])
+            self.assertTrue(all(policy["callback_contract"]["dedupe_key"] for policy in report["deadline_policies"]))
+            self.assertTrue(all("allowed_side_effect" in policy["callback_contract"] for policy in report["deadline_policies"]))
             self.assertTrue((root / "reports" / "deadline_alert_plan.json").exists())
         for expected in ["Deadline Alerts", "legacy Airflow 2 SLA", "incident", "freshness"]:
             self.assertIn(expected, docs)
@@ -690,6 +806,24 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn(expected, docs)
         for expected in ["CronPartitionTimetable", "PartitionedAssetTimetable", "StartOfHourMapper", "dag_run.partition_key", "partitioned_rollout_freeze_gate"]:
             self.assertIn(expected, dag)
+
+    def test_airflow33_stateful_orchestration_contract(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        dag = (repo / "airflow" / "dags" / "airflow33_stateful_incident_dag.py").read_text(encoding="utf-8")
+        docs = (repo / "docs" / "airflow-stateful-orchestration.md").read_text(encoding="utf-8")
+        ci = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        validator = (repo / "tools" / "validate_airflow33_dag.py").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            report = build_airflow_stateful_orchestration_plan(tmp, repo_root=repo)
+
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["recommended_action"], "adopt_airflow_33_stateful_incident_contract")
+        self.assertIn("real_airflow_parse_gate", {check["name"] for check in report["checks"] if check["passed"]})
+        for expected in ["task_state_store", "asset_state_store", "NEVER_EXPIRE", "ExceptionRetryPolicy", "RollupMapper", "FanOutMapper", "PartitionedAtRuntime"]:
+            self.assertIn(expected, dag)
+        self.assertIn("dag.validate()", validator)
+        self.assertIn("apache-airflow==3.3.0", ci)
+        self.assertIn("Production Boundary", docs)
 
     def test_multi_team_readiness_plan_and_airflow_config_exist(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -981,6 +1115,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("dynamic_task_mapping", names)
             self.assertIn("kueue_admission", names)
             self.assertIn("semantic_telemetry_contract", names)
+            self.assertIn("alert_routing_guarded_remediation", names)
             self.assertIn("airflow_deadline_alerts", names)
             self.assertIn("opencost_finops", names)
             self.assertIn("kueue_elastic_workloads", names)
@@ -990,6 +1125,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertIn("incident_image_volume_evidence", names)
             self.assertIn("airflow_dag_bundle_versioning", names)
             self.assertIn("airflow_asset_partitioning", names)
+            self.assertIn("airflow_stateful_orchestration", names)
             self.assertIn("airflow_multi_team_readiness", names)
             self.assertIn("airflow_event_driven_assets", names)
             self.assertIn("pod_resource_envelopes", names)
@@ -1043,6 +1179,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
                 "model_observability_dashboard.html",
                 "incident_summary.json",
                 "reliability_control_plan.json",
+                "root_cause_evidence_bundle.json",
                 "governance_evidence_bundle.json",
                 "slo_error_budget.json",
                 "accelerator_capacity_plan.json",
@@ -1119,7 +1256,29 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
 
             self.assertFalse(result["report"]["passed"])
             self.assertGreaterEqual(result["incidents"]["open_count"], 4)
-            self.assertTrue((root / "reports" / "model_observability_dashboard.html").exists())
+            dashboard_path = root / "reports" / "model_observability_dashboard.html"
+            self.assertTrue(dashboard_path.exists())
+            dashboard = dashboard_path.read_text(encoding="utf-8")
+            self.assertIn("Live Incident Response Lab", dashboard)
+            self.assertIn("Incident Evidence", dashboard)
+            self.assertIn('data-testid="release-evidence"', dashboard)
+            self.assertIn("Incident Review", dashboard)
+            self.assertIn('data-testid="run-review"', dashboard)
+            self.assertIn("edge-tts neural narration", dashboard)
+            self.assertIn("function renderDemoTheater", dashboard)
+            self.assertIn("Checks become durable incidents", dashboard)
+            self.assertIn('data-testid="incident-response-lab"', dashboard)
+            self.assertIn("Alert Routing Triage Lab", dashboard)
+            self.assertIn('data-testid="alert-routing-triage-lab"', dashboard)
+            self.assertIn("Root Cause Evidence", dashboard)
+            root_cause_bundle = (root / "reports" / "root_cause_evidence_bundle.json").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("incidentRootCauseFacet", root_cause_bundle)
+            self.assertIn("function buildEvaluation", dashboard)
+            self.assertIn("function renderRoutingLab", dashboard)
+            self.assertIn('apiJson("/v1/evaluations"', dashboard)
+            self.assertTrue(result["root_cause_evidence"]["passed"])
             self.assertTrue((root / "reports" / "index.html").exists())
             self.assertTrue((root / "reports" / "accelerator_capacity_plan.json").exists())
             self.assertTrue((root / "reports" / "device_allocation_plan.json").exists())
@@ -1139,6 +1298,8 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "incident_evidence_volume_plan.json").exists())
             self.assertTrue((root / "reports" / "dag_bundle_versioning_plan.json").exists())
             self.assertTrue((root / "reports" / "asset_partitioning_plan.json").exists())
+            self.assertTrue((root / "reports" / "airflow_stateful_orchestration_plan.json").exists())
+            self.assertTrue((root / "reports" / "reliability_signal_mesh.json").exists())
             self.assertTrue((root / "reports" / "multi_team_readiness_plan.json").exists())
             self.assertTrue((root / "reports" / "event_driven_assets_plan.json").exists())
             self.assertTrue((root / "reports" / "pod_resource_envelope_plan.json").exists())
@@ -1156,6 +1317,7 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertTrue((root / "reports" / "hpa_scale_to_zero_plan.json").exists())
             self.assertTrue((root / "reports" / "suspended_job_resources_plan.json").exists())
             self.assertTrue((root / "reports" / "constrained_impersonation_plan.json").exists())
+            self.assertTrue((root / "reports" / "root_cause_evidence_bundle.json").exists())
             self.assertTrue((root / "reports" / "release_admission_decision.json").exists())
             self.assertTrue((root / "reports" / "orchestration_scorecard.json").exists())
             self.assertTrue((root / "reports" / "supply_chain_evidence.json").exists())
@@ -1195,6 +1357,74 @@ class ModelObservabilityPlatformTest(unittest.TestCase):
             self.assertGreater(first["created_count"], 0)
             self.assertEqual(second["created_count"], 0)
             self.assertEqual(first["open_count"], second["open_count"])
+
+    def test_root_cause_evidence_bundle_explains_compound_incident(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reference = read_csv(generate_window(root / "reference.csv", window="reference"))
+            current = read_csv(generate_window(root / "current.csv", window="current", drift=True, errors=True))
+            report = run_checks(reference, current)
+            write_json(root / "reports" / "observability_report.json", report)
+            create_incidents(root, report)
+            build_reliability_plan(root)
+
+            bundle = build_root_cause_evidence_bundle(root)
+
+            self.assertTrue(bundle["passed"])
+            self.assertGreaterEqual(bundle["confidence"], 0.8)
+            self.assertEqual(bundle["root_cause"], "compound_population_shift_and_serving_degradation")
+            self.assertIn("population_shift", {item["signal"] for item in bundle["evidence"]})
+            self.assertIn("incidentRootCauseFacet", {facet["name"] for facet in bundle["lineage_facets"]})
+            self.assertIn("canary_route_weight", {flag["key"] for flag in bundle["feature_flag_context"]})
+            self.assertTrue((root / "reports" / "root_cause_evidence_bundle.json").exists())
+
+    def test_alert_routing_remediation_plan_and_assets_exist(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        manifest = (repo / "kubernetes" / "alert-routing-remediation.yaml").read_text(
+            encoding="utf-8"
+        )
+        docs = (repo / "docs" / "alert-routing-remediation.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = demo(root)
+            plan = build_alert_routing_remediation_plan(root)
+            dashboard = (root / "reports" / "model_observability_dashboard.html").read_text(
+                encoding="utf-8"
+            )
+            index = (root / "reports" / "index.html").read_text(encoding="utf-8")
+
+            self.assertTrue(result["alert_routing"]["passed"])
+            self.assertTrue(plan["passed"])
+            self.assertEqual(
+                plan["recommended_action"],
+                "enable_alert_routing_and_guarded_remediation",
+            )
+            self.assertGreaterEqual(len(plan["alertmanager"]["inhibited_alerts"]), 1)
+            self.assertTrue(any(item["requires_human"] for item in plan["remediations"]))
+            self.assertEqual(plan["lineage_impact"]["facet"], "columnLineage")
+            self.assertTrue((root / "reports" / "alert_routing_remediation_plan.json").exists())
+            self.assertIn("Alert Routing And Remediation", dashboard)
+            self.assertIn("Alert Routing Triage Lab", dashboard)
+            self.assertIn("routeScenario", dashboard)
+            self.assertIn("OpenLineage column impact path", dashboard)
+            self.assertIn("alert_routing_remediation_plan.json", index)
+        for expected in [
+            "AlertmanagerConfig",
+            "inhibitRules",
+            "pagerduty-ml-platform",
+            "incident-webhook",
+            "freeze-rollout-and-open-incident",
+            "AutoRemediationRequiresApproval",
+        ]:
+            self.assertIn(expected, manifest)
+        for expected in [
+            "Alertmanager",
+            "inhibition",
+            "Argo Rollouts",
+            "columnLineage",
+            "human approval",
+        ]:
+            self.assertIn(expected, docs)
 
     def test_compound_root_cause_is_classified(self) -> None:
         failed = [
